@@ -5,6 +5,8 @@ import type { ScenarioInputs, CalculationResults } from '../../types/scenario';
 import { calculateEmployeePension, calculateEmployerPension, calculatePensionPot, calculatePensionAtRetirement } from './pension';
 import { calculateBIKTaxableAmount } from './companyCard';
 import { calculateIncomeTax } from './incomeTax';
+export { getTaxBreakdown } from './incomeTax';
+export type { TaxBracketBreakdown } from './incomeTax';
 import { calculateNationalInsurance } from './nationalInsurance';
 import { calculateAdjustedNetIncome, calculateTotalBenefitsImpact } from './benefits';
 import { calculateMaxMortgage } from './mortgageRepayment';

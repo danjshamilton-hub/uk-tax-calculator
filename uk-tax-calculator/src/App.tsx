@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { calculateAllResults } from './lib/calculator';
+import { calculateAllResults, getTaxBreakdown } from './lib/calculator';
 import type { ScenarioInputs, HousePurchaseInputs, CalculationResults } from './types/scenario';
 import type { TaxRegion } from './data/taxRates2025';
 import { formatCurrency } from './lib/utils/formatters';
 
 function App() {
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<'salary' | 'house'>('salary');
+
   // Comparison mode
   const [compareMode, setCompareMode] = useState(false);
+
+  // Tax breakdown expansion
+  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
 
   // Basic inputs (Scenario A)
   const [grossSalary, setGrossSalary] = useState(50000);
@@ -41,7 +47,6 @@ function App() {
   const [usesTaxFreeChildcareB, setUsesTaxFreeChildcareB] = useState(true);
 
   // House purchase inputs
-  const [showHousePurchase, setShowHousePurchase] = useState(false);
   const [houseValuation, setHouseValuation] = useState(300000);
   const [purchasePrice, setPurchasePrice] = useState(300000);
   const [depositPercentage, setDepositPercentage] = useState(10);
@@ -53,21 +58,19 @@ function App() {
   const [mortgageInterestRate, setMortgageInterestRate] = useState(4.5);
   const [mortgageTerm, setMortgageTerm] = useState(25);
 
-  // Build house purchase inputs if enabled
-  const housePurchaseInputs: HousePurchaseInputs | undefined = showHousePurchase
-    ? {
-        houseValuation,
-        purchasePrice,
-        depositPercentage,
-        partnerGrossSalary,
-        currentBalance,
-        currentHouseSalePrice,
-        currentHouseMortgage,
-        movingCosts,
-        mortgageInterestRate,
-        mortgageTerm,
-      }
-    : undefined;
+  // Build house purchase inputs (always enabled for house tab)
+  const housePurchaseInputs: HousePurchaseInputs = {
+    houseValuation,
+    purchasePrice,
+    depositPercentage,
+    partnerGrossSalary,
+    currentBalance,
+    currentHouseSalePrice,
+    currentHouseMortgage,
+    movingCosts,
+    mortgageInterestRate,
+    mortgageTerm,
+  };
 
   // Build Scenario A inputs
   const inputsA: ScenarioInputs = {
@@ -186,24 +189,50 @@ function App() {
     );
   };
 
+  const tabStyle = (isActive: boolean) => ({
+    padding: '12px 24px',
+    border: 'none',
+    borderBottom: isActive ? '3px solid #2563EB' : '3px solid transparent',
+    background: isActive ? '#EFF6FF' : 'transparent',
+    color: isActive ? '#2563EB' : '#6B7280',
+    fontWeight: isActive ? '600' : '400' as const,
+    cursor: 'pointer',
+    fontSize: '15px',
+    transition: 'all 0.2s',
+  });
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial', maxWidth: compareMode ? '1400px' : '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h1 style={{ marginBottom: '8px' }}>UK Tax Calculator</h1>
           <p style={{ color: '#6B7280' }}>2025/26 Tax Year</p>
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#EFF6FF', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={compareMode}
-            onChange={(e) => setCompareMode(e.target.checked)}
-            style={{ width: '18px', height: '18px' }}
-          />
-          <span style={{ fontWeight: '500' }}>📊 Compare Scenarios</span>
-        </label>
+        {activeTab === 'salary' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#EFF6FF', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={compareMode}
+              onChange={(e) => setCompareMode(e.target.checked)}
+              style={{ width: '18px', height: '18px' }}
+            />
+            <span style={{ fontWeight: '500' }}>📊 Compare Scenarios</span>
+          </label>
+        )}
       </div>
 
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #E5E7EB', marginBottom: '24px' }}>
+        <button style={tabStyle(activeTab === 'salary')} onClick={() => setActiveTab('salary')}>
+          💼 Salary Calculator
+        </button>
+        <button style={tabStyle(activeTab === 'house')} onClick={() => setActiveTab('house')}>
+          🏠 House Purchase
+        </button>
+      </div>
+
+      {/* Salary Calculator Tab */}
+      {activeTab === 'salary' && (
       <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '24px' }}>
         {/* Input Form */}
         <div>
@@ -610,81 +639,6 @@ function App() {
             )}
           </div>
 
-          {/* House Purchase - hidden in compare mode for simplicity */}
-          {!compareMode && (
-            <div style={sectionStyle}>
-              <div style={sectionHeaderStyle}>
-                <input
-                  type="checkbox"
-                  checked={showHousePurchase}
-                  onChange={(e) => setShowHousePurchase(e.target.checked)}
-                  style={{ width: '18px', height: '18px' }}
-                />
-                <span>🏠 House Purchase Calculator</span>
-              </div>
-
-              {showHousePurchase && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={fieldStyle}>
-                      <label style={labelStyle}>Purchase Price (£)</label>
-                      <input type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(Number(e.target.value))} style={inputStyle} />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label style={labelStyle}>Valuation (£)</label>
-                      <input type="number" value={houseValuation} onChange={(e) => setHouseValuation(Number(e.target.value))} style={inputStyle} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={fieldStyle}>
-                      <label style={labelStyle}>Deposit (%)</label>
-                      <input type="number" value={depositPercentage} onChange={(e) => setDepositPercentage(Number(e.target.value))} style={inputStyle} min="5" max="100" />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label style={labelStyle}>Partner Salary (£/yr)</label>
-                      <input type="number" value={partnerGrossSalary} onChange={(e) => setPartnerGrossSalary(Number(e.target.value))} style={inputStyle} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={fieldStyle}>
-                      <label style={labelStyle}>Savings (£)</label>
-                      <input type="number" value={currentBalance} onChange={(e) => setCurrentBalance(Number(e.target.value))} style={inputStyle} />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label style={labelStyle}>Moving Costs (£)</label>
-                      <input type="number" value={movingCosts} onChange={(e) => setMovingCosts(Number(e.target.value))} style={inputStyle} />
-                    </div>
-                  </div>
-                  <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '12px', marginTop: '8px' }}>
-                    <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '8px' }}>Current Property (if selling)</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={fieldStyle}>
-                        <label style={labelStyle}>Sale Price (£)</label>
-                        <input type="number" value={currentHouseSalePrice} onChange={(e) => setCurrentHouseSalePrice(Number(e.target.value))} style={inputStyle} />
-                      </div>
-                      <div style={fieldStyle}>
-                        <label style={labelStyle}>Remaining Mortgage (£)</label>
-                        <input type="number" value={currentHouseMortgage} onChange={(e) => setCurrentHouseMortgage(Number(e.target.value))} style={inputStyle} />
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '12px', marginTop: '8px' }}>
-                    <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '8px' }}>Mortgage Terms</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={fieldStyle}>
-                        <label style={labelStyle}>Interest Rate (%)</label>
-                        <input type="number" value={mortgageInterestRate} onChange={(e) => setMortgageInterestRate(Number(e.target.value))} style={inputStyle} step="0.1" />
-                      </div>
-                      <div style={fieldStyle}>
-                        <label style={labelStyle}>Term (years)</label>
-                        <input type="number" value={mortgageTerm} onChange={(e) => setMortgageTerm(Number(e.target.value))} style={inputStyle} min="5" max="40" />
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Results */}
@@ -712,7 +666,50 @@ function App() {
                 {(resultA.carSalarySacrifice > 0 || (resultB?.carSalarySacrifice ?? 0) > 0) && (
                   <CompareRow label="Car Salary Sacrifice" valueA={resultA.carSalarySacrifice} valueB={resultB?.carSalarySacrifice ?? null} isDeduction />
                 )}
-                <CompareRow label="Income Tax" valueA={resultA.incomeTax} valueB={resultB?.incomeTax ?? null} isDeduction />
+                <tr
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+                >
+                  <td style={{ padding: '6px 0' }}>
+                    <span style={{ marginRight: '6px' }}>{showTaxBreakdown ? '▼' : '▶'}</span>
+                    Income Tax
+                  </td>
+                  <td style={{ textAlign: 'right', color: '#DC2626' }}>-{formatCurrency(resultA.incomeTax)}</td>
+                  {compareMode && resultB && (
+                    <>
+                      <td style={{ textAlign: 'right', color: '#DC2626' }}>-{formatCurrency(resultB.incomeTax)}</td>
+                      <td style={{ textAlign: 'right', color: resultB.incomeTax - resultA.incomeTax < 0 ? '#059669' : '#DC2626', fontSize: '13px' }}>
+                        {resultB.incomeTax - resultA.incomeTax !== 0 && (
+                          <>{resultB.incomeTax - resultA.incomeTax > 0 ? '+' : ''}{formatCurrency(resultB.incomeTax - resultA.incomeTax)}</>
+                        )}
+                      </td>
+                    </>
+                  )}
+                </tr>
+                {showTaxBreakdown && getTaxBreakdown(resultA.taxableIncome, taxRegion).map((bracket, idx) => (
+                  <tr key={idx} style={{ background: '#F9FAFB', fontSize: '12px' }}>
+                    <td style={{ padding: '3px 0 3px 20px', color: '#6B7280' }}>
+                      {bracket.bandName} ({bracket.rate}%)
+                      <span style={{ color: '#9CA3AF', marginLeft: '4px' }}>
+                        £{bracket.min.toLocaleString()}{bracket.max ? ` - £${bracket.max.toLocaleString()}` : '+'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right', color: bracket.taxInBand > 0 ? '#DC2626' : '#9CA3AF' }}>
+                      {bracket.taxInBand > 0 ? `-${formatCurrency(bracket.taxInBand)}` : '-'}
+                    </td>
+                    {compareMode && resultB && (
+                      <>
+                        <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                          {(() => {
+                            const bracketB = getTaxBreakdown(resultB.taxableIncome, taxRegion)[idx];
+                            return bracketB && bracketB.taxInBand > 0 ? `-${formatCurrency(bracketB.taxInBand)}` : '-';
+                          })()}
+                        </td>
+                        <td></td>
+                      </>
+                    )}
+                  </tr>
+                ))}
                 <CompareRow label="National Insurance" valueA={resultA.nationalInsurance} valueB={resultB?.nationalInsurance ?? null} isDeduction />
                 {(resultA.bikTax > 0 || (resultB?.bikTax ?? 0) > 0) && (
                   <CompareRow label="BIK Tax" valueA={resultA.bikTax} valueB={resultB?.bikTax ?? null} isDeduction />
@@ -741,6 +738,39 @@ function App() {
                       <td style={{ textAlign: 'right', color: adjB.adjustedMonthly - adjA.adjustedMonthly > 0 ? '#059669' : '#DC2626' }}>
                         {adjB.adjustedMonthly - adjA.adjustedMonthly > 0 ? '+' : ''}{formatCurrency(adjB.adjustedMonthly - adjA.adjustedMonthly)}
                       </td>
+                    </>
+                  )}
+                </tr>
+                <tr style={{ borderTop: '1px solid #D1D5DB', background: '#F3F4F6' }}>
+                  <td colSpan={compareMode ? 4 : 1} style={{ padding: '8px 0 4px', fontSize: '12px', color: '#6B7280', fontWeight: '600' }}>Monthly Breakdown (for comparison)</td>
+                </tr>
+                <tr style={{ background: '#F3F4F6' }}>
+                  <td style={{ padding: '4px 0', fontSize: '13px', color: '#6B7280' }}>Monthly Gross</td>
+                  <td style={{ textAlign: 'right', fontSize: '13px', color: '#6B7280' }}>{formatCurrency(resultA.grossSalary / 12)}</td>
+                  {compareMode && resultB && (
+                    <>
+                      <td style={{ textAlign: 'right', fontSize: '13px', color: '#6B7280' }}>{formatCurrency(resultB.grossSalary / 12)}</td>
+                      <td></td>
+                    </>
+                  )}
+                </tr>
+                <tr style={{ background: '#F3F4F6' }}>
+                  <td style={{ padding: '4px 0', fontSize: '13px', color: '#6B7280' }}>Monthly Income Tax</td>
+                  <td style={{ textAlign: 'right', fontSize: '13px', color: '#6B7280' }}>{formatCurrency(resultA.incomeTax / 12)}</td>
+                  {compareMode && resultB && (
+                    <>
+                      <td style={{ textAlign: 'right', fontSize: '13px', color: '#6B7280' }}>{formatCurrency(resultB.incomeTax / 12)}</td>
+                      <td></td>
+                    </>
+                  )}
+                </tr>
+                <tr style={{ background: '#F3F4F6' }}>
+                  <td style={{ padding: '4px 0', fontSize: '13px', color: '#6B7280' }}>Monthly NI</td>
+                  <td style={{ textAlign: 'right', fontSize: '13px', color: '#6B7280' }}>{formatCurrency(resultA.nationalInsurance / 12)}</td>
+                  {compareMode && resultB && (
+                    <>
+                      <td style={{ textAlign: 'right', fontSize: '13px', color: '#6B7280' }}>{formatCurrency(resultB.nationalInsurance / 12)}</td>
+                      <td></td>
                     </>
                   )}
                 </tr>
@@ -807,78 +837,17 @@ function App() {
           </div>
 
           {/* Mortgage Capacity */}
-          {!showHousePurchase && (
-            <div style={{ background: '#FEF3C7', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
-              <h3 style={{ marginBottom: '12px', fontSize: '16px', color: '#92400E' }}>🏠 Mortgage Capacity</h3>
-              <table style={{ width: '100%' }}>
-                <tbody>
-                  <CompareRow label="Max mortgage (4.5x take-home)" valueA={resultA.maxMortgageCapacity} valueB={resultB?.maxMortgageCapacity ?? null} />
-                </tbody>
-              </table>
+          <div style={{ background: '#FEF3C7', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '16px', color: '#92400E' }}>🏠 Mortgage Capacity</h3>
+            <table style={{ width: '100%' }}>
+              <tbody>
+                <CompareRow label="Max mortgage (4.5x take-home)" valueA={resultA.maxMortgageCapacity} valueB={resultB?.maxMortgageCapacity ?? null} />
+              </tbody>
+            </table>
+            <div style={{ marginTop: '12px', fontSize: '13px', color: '#92400E' }}>
+              See the House Purchase tab for full affordability analysis
             </div>
-          )}
-
-          {/* House Purchase Analysis - only in non-compare mode */}
-          {!compareMode && showHousePurchase && resultA.housePurchase && (
-            <div style={{ background: resultA.housePurchase.canAfford ? '#F0FDF4' : '#FEF2F2', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
-              <h3 style={{ marginBottom: '12px', fontSize: '16px', color: resultA.housePurchase.canAfford ? '#166534' : '#991B1B' }}>
-                🏠 House Purchase Analysis
-              </h3>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Mortgage</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>Max capacity (4.5x):</span>
-                  <span>{formatCurrency(resultA.housePurchase.maxMortgageCapacity)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>Mortgage amount:</span>
-                  <span>{formatCurrency(resultA.housePurchase.mortgageNeeded)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>Monthly repayment:</span>
-                  <span>{formatCurrency(resultA.housePurchase.monthlyRepayment)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: resultA.housePurchase.isMonthlyAffordable ? '#166534' : '#DC2626' }}>
-                  <span>% of take-home:</span>
-                  <span>{resultA.housePurchase.monthlyRepaymentPercentage.toFixed(1)}% {resultA.housePurchase.isMonthlyAffordable ? '✓' : '✗'}</span>
-                </div>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Cash Required</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>Cash for property:</span>
-                  <span>{formatCurrency(purchasePrice - resultA.housePurchase.mortgageNeeded)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>{taxRegion === 'scotland' ? 'LBTT' : 'Stamp Duty'}:</span>
-                  <span>{formatCurrency(resultA.housePurchase.lbttOrStampDuty)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderTop: '1px solid #D1D5DB', paddingTop: '4px' }}>
-                  <span>Total required:</span>
-                  <span>{formatCurrency(resultA.housePurchase.totalCashRequired)}</span>
-                </div>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Cash Available: {formatCurrency(resultA.housePurchase.cashAvailable)}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: resultA.housePurchase.cashSurplusOrShortfall >= 0 ? '#166534' : '#DC2626' }}>
-                  <span>{resultA.housePurchase.cashSurplusOrShortfall >= 0 ? 'Surplus:' : 'Shortfall:'}</span>
-                  <span>{formatCurrency(Math.abs(resultA.housePurchase.cashSurplusOrShortfall))}</span>
-                </div>
-              </div>
-              <div style={{ padding: '12px', background: resultA.housePurchase.canAfford ? '#DCFCE7' : '#FEE2E2', borderRadius: '6px' }}>
-                <div style={{ fontWeight: 'bold', color: resultA.housePurchase.canAfford ? '#166534' : '#991B1B' }}>
-                  {resultA.housePurchase.canAfford ? '✓ Affordable' : '✗ Not Affordable'}
-                </div>
-                {resultA.housePurchase.affordabilityIssues.length > 0 && (
-                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '13px' }}>
-                    {resultA.housePurchase.affordabilityIssues.map((issue, idx) => (
-                      <li key={idx}>{issue}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Warnings */}
           {resultA.cliffEdgeWarnings.length > 0 && (
@@ -893,6 +862,277 @@ function App() {
           )}
         </div>
       </div>
+      )}
+
+      {/* House Purchase Tab */}
+      {activeTab === 'house' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '24px' }}>
+          {/* House Purchase Inputs */}
+          <div>
+            {/* Income Summary from Salary Tab */}
+            <div style={{ ...sectionStyle, background: '#EFF6FF' }}>
+              <h2 style={sectionHeaderStyle}>💼 Income Summary</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span>Your Annual Take-Home:</span>
+                <span style={{ fontWeight: 'bold', color: '#059669' }}>{formatCurrency(adjA.adjustedAnnual)}</span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                Based on {formatCurrency(grossSalary)} gross salary
+              </div>
+            </div>
+
+            {/* Partner Income */}
+            <div style={sectionStyle}>
+              <h2 style={sectionHeaderStyle}>👫 Partner Income</h2>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Partner Gross Salary (£/year)</label>
+                <input
+                  type="number"
+                  value={partnerGrossSalary}
+                  onChange={(e) => setPartnerGrossSalary(Number(e.target.value))}
+                  style={inputStyle}
+                />
+                <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                  Enter 0 if no partner or single applicant
+                </span>
+              </div>
+              {partnerGrossSalary > 0 && (
+                <div style={{ background: '#F0FDF4', padding: '12px', borderRadius: '6px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span>Partner take-home (est.):</span>
+                    <span style={{ fontWeight: 'bold' }}>{formatCurrency(partnerGrossSalary * 0.7)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: '#166534' }}>
+                    <span>Combined take-home:</span>
+                    <span>{formatCurrency(adjA.adjustedAnnual + partnerGrossSalary * 0.7)}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                    Partner estimate assumes ~30% deductions
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Property Details */}
+            <div style={sectionStyle}>
+              <h2 style={sectionHeaderStyle}>🏠 Property Details</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Purchase Price (£)</label>
+                  <input type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(Number(e.target.value))} style={inputStyle} />
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Valuation (£)</label>
+                  <input type="number" value={houseValuation} onChange={(e) => setHouseValuation(Number(e.target.value))} style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Deposit (%)</label>
+                  <input type="number" value={depositPercentage} onChange={(e) => setDepositPercentage(Number(e.target.value))} style={inputStyle} min="5" max="100" />
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Tax Region</label>
+                  <select value={taxRegion} onChange={(e) => setTaxRegion(e.target.value as TaxRegion)} style={inputStyle}>
+                    <option value="scotland">Scotland (LBTT)</option>
+                    <option value="england">England (Stamp Duty)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Cash Position */}
+            <div style={sectionStyle}>
+              <h2 style={sectionHeaderStyle}>💰 Cash Position</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Current Savings (£)</label>
+                  <input type="number" value={currentBalance} onChange={(e) => setCurrentBalance(Number(e.target.value))} style={inputStyle} />
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Moving Costs (£)</label>
+                  <input type="number" value={movingCosts} onChange={(e) => setMovingCosts(Number(e.target.value))} style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '12px', marginTop: '8px' }}>
+                <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: '8px' }}>Current Property (if selling)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Sale Price (£)</label>
+                    <input type="number" value={currentHouseSalePrice} onChange={(e) => setCurrentHouseSalePrice(Number(e.target.value))} style={inputStyle} />
+                  </div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Remaining Mortgage (£)</label>
+                    <input type="number" value={currentHouseMortgage} onChange={(e) => setCurrentHouseMortgage(Number(e.target.value))} style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mortgage Terms */}
+            <div style={sectionStyle}>
+              <h2 style={sectionHeaderStyle}>📋 Mortgage Terms</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Interest Rate (%)</label>
+                  <input type="number" value={mortgageInterestRate} onChange={(e) => setMortgageInterestRate(Number(e.target.value))} style={inputStyle} step="0.1" />
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Term (years)</label>
+                  <input type="number" value={mortgageTerm} onChange={(e) => setMortgageTerm(Number(e.target.value))} style={inputStyle} min="5" max="40" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* House Purchase Results */}
+          <div>
+            {resultA.housePurchase ? (
+              <>
+                {/* Affordability Summary */}
+                <div style={{ background: resultA.housePurchase.canAfford ? '#F0FDF4' : '#FEF2F2', padding: '20px', borderRadius: '8px' }}>
+                  <h2 style={{ marginBottom: '16px', fontSize: '18px', color: resultA.housePurchase.canAfford ? '#166534' : '#991B1B' }}>
+                    {resultA.housePurchase.canAfford ? '✓ Affordable' : '✗ Not Affordable'}
+                  </h2>
+                  {resultA.housePurchase.affordabilityIssues.length > 0 && (
+                    <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '14px', color: '#991B1B' }}>
+                      {resultA.housePurchase.affordabilityIssues.map((issue, idx) => (
+                        <li key={idx}>{issue}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Mortgage Analysis */}
+                <div style={{ background: '#EFF6FF', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '16px' }}>📊 Mortgage Analysis</h3>
+                  <table style={{ width: '100%' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '8px 0' }}>Your take-home</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(adjA.adjustedAnnual)}</td>
+                      </tr>
+                      {partnerGrossSalary > 0 && (
+                        <tr>
+                          <td style={{ padding: '8px 0' }}>Partner take-home (est.)</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(partnerGrossSalary * 0.7)}</td>
+                        </tr>
+                      )}
+                      <tr style={{ fontWeight: 'bold', borderTop: '1px solid #D1D5DB' }}>
+                        <td style={{ padding: '8px 0' }}>Combined annual income</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(adjA.adjustedAnnual + (partnerGrossSalary > 0 ? partnerGrossSalary * 0.7 : 0))}</td>
+                      </tr>
+                      <tr style={{ background: '#DBEAFE' }}>
+                        <td style={{ padding: '8px 0', fontWeight: 'bold' }}>Max mortgage (4.5x)</td>
+                        <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>{formatCurrency(resultA.housePurchase.maxMortgageCapacity)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '8px 0' }}>Mortgage needed</td>
+                        <td style={{ textAlign: 'right', color: resultA.housePurchase.mortgageNeeded <= resultA.housePurchase.maxMortgageCapacity ? '#059669' : '#DC2626' }}>
+                          {formatCurrency(resultA.housePurchase.mortgageNeeded)}
+                          {resultA.housePurchase.mortgageNeeded <= resultA.housePurchase.maxMortgageCapacity ? ' ✓' : ' ✗'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '8px 0' }}>Monthly repayment</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.monthlyRepayment)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '8px 0' }}>% of monthly take-home</td>
+                        <td style={{ textAlign: 'right', color: resultA.housePurchase.isMonthlyAffordable ? '#059669' : '#DC2626' }}>
+                          {resultA.housePurchase.monthlyRepaymentPercentage.toFixed(1)}%
+                          {resultA.housePurchase.isMonthlyAffordable ? ' ✓' : ' ✗'}
+                          <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '4px' }}>(max 35%)</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Cash Required */}
+                <div style={{ background: '#FEF3C7', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '16px', color: '#92400E' }}>💰 Cash Required</h3>
+                  <table style={{ width: '100%' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '6px 0' }}>Purchase price</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(purchasePrice)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '6px 0' }}>Less: Mortgage</td>
+                        <td style={{ textAlign: 'right', color: '#059669' }}>-{formatCurrency(resultA.housePurchase.mortgageNeeded)}</td>
+                      </tr>
+                      <tr style={{ borderTop: '1px solid #E5E7EB' }}>
+                        <td style={{ padding: '6px 0' }}>Cash for property</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(purchasePrice - resultA.housePurchase.mortgageNeeded)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '6px 0' }}>{taxRegion === 'scotland' ? 'LBTT' : 'Stamp Duty'}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.lbttOrStampDuty)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '6px 0' }}>Moving costs</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(movingCosts)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold', borderTop: '1px solid #D1D5DB' }}>
+                        <td style={{ padding: '8px 0' }}>Total required</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.totalCashRequired)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {(purchasePrice - resultA.housePurchase.mortgageNeeded) > (purchasePrice * depositPercentage / 100) && (
+                    <div style={{ marginTop: '12px', padding: '8px', background: '#FEF2F2', borderRadius: '4px', fontSize: '12px', color: '#991B1B' }}>
+                      Note: Cash needed exceeds {depositPercentage}% deposit (£{(purchasePrice * depositPercentage / 100).toLocaleString()}) because mortgage is capped at your max borrowing capacity.
+                    </div>
+                  )}
+                </div>
+
+                {/* Cash Available */}
+                <div style={{ background: resultA.housePurchase.cashSurplusOrShortfall >= 0 ? '#F0FDF4' : '#FEF2F2', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '16px', color: resultA.housePurchase.cashSurplusOrShortfall >= 0 ? '#166534' : '#991B1B' }}>
+                    💵 Cash Position
+                  </h3>
+                  <table style={{ width: '100%' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '6px 0' }}>Current savings</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(currentBalance)}</td>
+                      </tr>
+                      {currentHouseSalePrice > 0 && (
+                        <>
+                          <tr>
+                            <td style={{ padding: '6px 0' }}>House sale proceeds</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(currentHouseSalePrice)}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '6px 0' }}>Less mortgage to clear</td>
+                            <td style={{ textAlign: 'right', color: '#DC2626' }}>-{formatCurrency(currentHouseMortgage)}</td>
+                          </tr>
+                        </>
+                      )}
+                      <tr style={{ fontWeight: 'bold', borderTop: '1px solid #D1D5DB' }}>
+                        <td style={{ padding: '8px 0' }}>Total available</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.cashAvailable)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold', fontSize: '18px', background: resultA.housePurchase.cashSurplusOrShortfall >= 0 ? '#DCFCE7' : '#FEE2E2' }}>
+                        <td style={{ padding: '12px 0' }}>{resultA.housePurchase.cashSurplusOrShortfall >= 0 ? 'Surplus' : 'Shortfall'}</td>
+                        <td style={{ textAlign: 'right', color: resultA.housePurchase.cashSurplusOrShortfall >= 0 ? '#166534' : '#DC2626' }}>
+                          {formatCurrency(Math.abs(resultA.housePurchase.cashSurplusOrShortfall))}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div style={{ background: '#F3F4F6', padding: '40px', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
+                <p style={{ color: '#6B7280' }}>Enter property details to see affordability analysis</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
