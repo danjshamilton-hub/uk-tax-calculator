@@ -3,6 +3,13 @@ import { calculateAllResults, getTaxBreakdown } from './lib/calculator';
 import type { ScenarioInputs, HousePurchaseInputs, CalculationResults } from './types/scenario';
 import type { TaxRegion } from './data/taxRates2025';
 import { formatCurrency } from './lib/utils/formatters';
+import { constants } from './data/constants';
+
+// Helper to safely parse numeric input and prevent NaN
+function safeNumber(value: string | number, fallback: number = 0): number {
+  const parsed = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(parsed) ? fallback : parsed;
+}
 
 function App() {
   // Tab navigation
@@ -250,7 +257,7 @@ function App() {
                       <input
                         type="number"
                         value={grossSalary}
-                        onChange={(e) => setGrossSalary(Number(e.target.value))}
+                        onChange={(e) => setGrossSalary(safeNumber(e.target.value, 0))}
                         style={inputStyle}
                       />
                     </div>
@@ -259,7 +266,7 @@ function App() {
                       <input
                         type="number"
                         value={employeePensionPercentage}
-                        onChange={(e) => setEmployeePensionPercentage(Number(e.target.value))}
+                        onChange={(e) => setEmployeePensionPercentage(safeNumber(e.target.value, 0))}
                         style={inputStyle}
                         min="0"
                         max="100"
@@ -273,7 +280,7 @@ function App() {
                       <input
                         type="number"
                         value={grossSalaryB}
-                        onChange={(e) => setGrossSalaryB(Number(e.target.value))}
+                        onChange={(e) => setGrossSalaryB(safeNumber(e.target.value, 0))}
                         style={{ ...inputStyle, borderColor: '#2563EB' }}
                       />
                     </div>
@@ -282,7 +289,7 @@ function App() {
                       <input
                         type="number"
                         value={employeePensionPercentageB}
-                        onChange={(e) => setEmployeePensionPercentageB(Number(e.target.value))}
+                        onChange={(e) => setEmployeePensionPercentageB(safeNumber(e.target.value, 0))}
                         style={{ ...inputStyle, borderColor: '#2563EB' }}
                         min="0"
                         max="100"
@@ -297,7 +304,7 @@ function App() {
                 <input
                   type="number"
                   value={grossSalary}
-                  onChange={(e) => setGrossSalary(Number(e.target.value))}
+                  onChange={(e) => setGrossSalary(safeNumber(e.target.value, 0))}
                   style={inputStyle}
                 />
               </div>
@@ -322,7 +329,7 @@ function App() {
                   <input
                     type="number"
                     value={employeePensionPercentage}
-                    onChange={(e) => setEmployeePensionPercentage(Number(e.target.value))}
+                    onChange={(e) => setEmployeePensionPercentage(safeNumber(e.target.value, 0))}
                     style={inputStyle}
                     min="0"
                     max="100"
@@ -333,7 +340,7 @@ function App() {
                   <input
                     type="number"
                     value={employerPensionPercentage}
-                    onChange={(e) => setEmployerPensionPercentage(Number(e.target.value))}
+                    onChange={(e) => setEmployerPensionPercentage(safeNumber(e.target.value, 0))}
                     style={inputStyle}
                     min="0"
                     max="100"
@@ -348,7 +355,7 @@ function App() {
                 <input
                   type="number"
                   value={employerPensionPercentage}
-                  onChange={(e) => setEmployerPensionPercentage(Number(e.target.value))}
+                  onChange={(e) => setEmployerPensionPercentage(safeNumber(e.target.value, 0))}
                   style={inputStyle}
                   min="0"
                   max="100"
@@ -362,7 +369,7 @@ function App() {
                 <input
                   type="number"
                   value={currentAge}
-                  onChange={(e) => setCurrentAge(Number(e.target.value))}
+                  onChange={(e) => setCurrentAge(safeNumber(e.target.value, 35))}
                   style={inputStyle}
                   min="18"
                   max="100"
@@ -373,7 +380,7 @@ function App() {
                 <input
                   type="number"
                   value={retirementAge}
-                  onChange={(e) => setRetirementAge(Number(e.target.value))}
+                  onChange={(e) => setRetirementAge(safeNumber(e.target.value, 65))}
                   style={inputStyle}
                   min="50"
                   max="100"
@@ -406,7 +413,7 @@ function App() {
                         <input
                           type="number"
                           value={carSalarySacrifice}
-                          onChange={(e) => setCarSalarySacrifice(Number(e.target.value))}
+                          onChange={(e) => setCarSalarySacrifice(safeNumber(e.target.value, 0))}
                           style={inputStyle}
                         />
                       </div>
@@ -415,7 +422,7 @@ function App() {
                         <input
                           type="number"
                           value={carP11DValue}
-                          onChange={(e) => setCarP11DValue(Number(e.target.value))}
+                          onChange={(e) => setCarP11DValue(safeNumber(e.target.value, 0))}
                           style={inputStyle}
                         />
                       </div>
@@ -424,7 +431,7 @@ function App() {
                         <input
                           type="number"
                           value={carBIKPercentage}
-                          onChange={(e) => setCarBIKPercentage(Number(e.target.value))}
+                          onChange={(e) => setCarBIKPercentage(safeNumber(e.target.value, 2))}
                           style={inputStyle}
                           min="0"
                           max="37"
@@ -451,7 +458,7 @@ function App() {
                         <input
                           type="number"
                           value={carSalarySacrificeB}
-                          onChange={(e) => setCarSalarySacrificeB(Number(e.target.value))}
+                          onChange={(e) => setCarSalarySacrificeB(safeNumber(e.target.value, 0))}
                           style={{ ...inputStyle, borderColor: '#2563EB' }}
                         />
                       </div>
@@ -460,7 +467,7 @@ function App() {
                         <input
                           type="number"
                           value={carP11DValueB}
-                          onChange={(e) => setCarP11DValueB(Number(e.target.value))}
+                          onChange={(e) => setCarP11DValueB(safeNumber(e.target.value, 0))}
                           style={{ ...inputStyle, borderColor: '#2563EB' }}
                         />
                       </div>
@@ -469,7 +476,7 @@ function App() {
                         <input
                           type="number"
                           value={carBIKPercentageB}
-                          onChange={(e) => setCarBIKPercentageB(Number(e.target.value))}
+                          onChange={(e) => setCarBIKPercentageB(safeNumber(e.target.value, 2))}
                           style={{ ...inputStyle, borderColor: '#2563EB' }}
                           min="0"
                           max="37"
@@ -498,7 +505,7 @@ function App() {
                       <input
                         type="number"
                         value={carSalarySacrifice}
-                        onChange={(e) => setCarSalarySacrifice(Number(e.target.value))}
+                        onChange={(e) => setCarSalarySacrifice(safeNumber(e.target.value, 0))}
                         style={inputStyle}
                       />
                     </div>
@@ -509,7 +516,7 @@ function App() {
                         <input
                           type="number"
                           value={carP11DValue}
-                          onChange={(e) => setCarP11DValue(Number(e.target.value))}
+                          onChange={(e) => setCarP11DValue(safeNumber(e.target.value, 0))}
                           style={inputStyle}
                         />
                       </div>
@@ -518,7 +525,7 @@ function App() {
                         <input
                           type="number"
                           value={carBIKPercentage}
-                          onChange={(e) => setCarBIKPercentage(Number(e.target.value))}
+                          onChange={(e) => setCarBIKPercentage(safeNumber(e.target.value, 2))}
                           style={inputStyle}
                           min="0"
                           max="37"
@@ -551,7 +558,7 @@ function App() {
                   <input
                     type="number"
                     value={numberOfChildren}
-                    onChange={(e) => setNumberOfChildren(Number(e.target.value))}
+                    onChange={(e) => setNumberOfChildren(safeNumber(e.target.value, 1))}
                     style={inputStyle}
                     min="1"
                     max="10"
@@ -889,25 +896,22 @@ function App() {
                 <input
                   type="number"
                   value={partnerGrossSalary}
-                  onChange={(e) => setPartnerGrossSalary(Number(e.target.value))}
+                  onChange={(e) => setPartnerGrossSalary(safeNumber(e.target.value, 0))}
                   style={inputStyle}
                 />
                 <span style={{ fontSize: '11px', color: '#6B7280' }}>
                   Enter 0 if no partner or single applicant
                 </span>
               </div>
-              {partnerGrossSalary > 0 && (
+              {partnerGrossSalary > 0 && resultA.housePurchase && (
                 <div style={{ background: '#F0FDF4', padding: '12px', borderRadius: '6px', marginTop: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span>Partner take-home (est.):</span>
-                    <span style={{ fontWeight: 'bold' }}>{formatCurrency(partnerGrossSalary * 0.7)}</span>
+                    <span>Partner take-home:</span>
+                    <span style={{ fontWeight: 'bold' }}>{formatCurrency(resultA.housePurchase.partnerAnnualTakeHome)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: '#166534' }}>
                     <span>Combined take-home:</span>
-                    <span>{formatCurrency(adjA.adjustedAnnual + partnerGrossSalary * 0.7)}</span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
-                    Partner estimate assumes ~30% deductions
+                    <span>{formatCurrency(resultA.housePurchase.combinedAnnualTakeHome)}</span>
                   </div>
                 </div>
               )}
@@ -919,17 +923,17 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Purchase Price (£)</label>
-                  <input type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(Number(e.target.value))} style={inputStyle} />
+                  <input type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(safeNumber(e.target.value, 0))} style={inputStyle} />
                 </div>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Valuation (£)</label>
-                  <input type="number" value={houseValuation} onChange={(e) => setHouseValuation(Number(e.target.value))} style={inputStyle} />
+                  <input type="number" value={houseValuation} onChange={(e) => setHouseValuation(safeNumber(e.target.value, 0))} style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Deposit (%)</label>
-                  <input type="number" value={depositPercentage} onChange={(e) => setDepositPercentage(Number(e.target.value))} style={inputStyle} min="5" max="100" />
+                  <input type="number" value={depositPercentage} onChange={(e) => setDepositPercentage(safeNumber(e.target.value, 10))} style={inputStyle} min="5" max="100" />
                 </div>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Tax Region</label>
@@ -947,11 +951,11 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Current Savings (£)</label>
-                  <input type="number" value={currentBalance} onChange={(e) => setCurrentBalance(Number(e.target.value))} style={inputStyle} />
+                  <input type="number" value={currentBalance} onChange={(e) => setCurrentBalance(safeNumber(e.target.value, 0))} style={inputStyle} />
                 </div>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Moving Costs (£)</label>
-                  <input type="number" value={movingCosts} onChange={(e) => setMovingCosts(Number(e.target.value))} style={inputStyle} />
+                  <input type="number" value={movingCosts} onChange={(e) => setMovingCosts(safeNumber(e.target.value, 0))} style={inputStyle} />
                 </div>
               </div>
               <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '12px', marginTop: '8px' }}>
@@ -959,11 +963,11 @@ function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={fieldStyle}>
                     <label style={labelStyle}>Sale Price (£)</label>
-                    <input type="number" value={currentHouseSalePrice} onChange={(e) => setCurrentHouseSalePrice(Number(e.target.value))} style={inputStyle} />
+                    <input type="number" value={currentHouseSalePrice} onChange={(e) => setCurrentHouseSalePrice(safeNumber(e.target.value, 0))} style={inputStyle} />
                   </div>
                   <div style={fieldStyle}>
                     <label style={labelStyle}>Remaining Mortgage (£)</label>
-                    <input type="number" value={currentHouseMortgage} onChange={(e) => setCurrentHouseMortgage(Number(e.target.value))} style={inputStyle} />
+                    <input type="number" value={currentHouseMortgage} onChange={(e) => setCurrentHouseMortgage(safeNumber(e.target.value, 0))} style={inputStyle} />
                   </div>
                 </div>
               </div>
@@ -975,11 +979,11 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Interest Rate (%)</label>
-                  <input type="number" value={mortgageInterestRate} onChange={(e) => setMortgageInterestRate(Number(e.target.value))} style={inputStyle} step="0.1" />
+                  <input type="number" value={mortgageInterestRate} onChange={(e) => setMortgageInterestRate(safeNumber(e.target.value, 4.5))} style={inputStyle} step="0.1" />
                 </div>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Term (years)</label>
-                  <input type="number" value={mortgageTerm} onChange={(e) => setMortgageTerm(Number(e.target.value))} style={inputStyle} min="5" max="40" />
+                  <input type="number" value={mortgageTerm} onChange={(e) => setMortgageTerm(safeNumber(e.target.value, 25))} style={inputStyle} min="5" max="40" />
                 </div>
               </div>
             </div>
@@ -1010,17 +1014,17 @@ function App() {
                     <tbody>
                       <tr>
                         <td style={{ padding: '8px 0' }}>Your take-home</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(adjA.adjustedAnnual)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.yourAnnualTakeHome)}</td>
                       </tr>
                       {partnerGrossSalary > 0 && (
                         <tr>
-                          <td style={{ padding: '8px 0' }}>Partner take-home (est.)</td>
-                          <td style={{ textAlign: 'right' }}>{formatCurrency(partnerGrossSalary * 0.7)}</td>
+                          <td style={{ padding: '8px 0' }}>Partner take-home</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.partnerAnnualTakeHome)}</td>
                         </tr>
                       )}
                       <tr style={{ fontWeight: 'bold', borderTop: '1px solid #D1D5DB' }}>
                         <td style={{ padding: '8px 0' }}>Combined annual income</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(adjA.adjustedAnnual + (partnerGrossSalary > 0 ? partnerGrossSalary * 0.7 : 0))}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.combinedAnnualTakeHome)}</td>
                       </tr>
                       <tr style={{ background: '#DBEAFE' }}>
                         <td style={{ padding: '8px 0', fontWeight: 'bold' }}>Max mortgage (4.5x)</td>
@@ -1042,7 +1046,7 @@ function App() {
                         <td style={{ textAlign: 'right', color: resultA.housePurchase.isMonthlyAffordable ? '#059669' : '#DC2626' }}>
                           {resultA.housePurchase.monthlyRepaymentPercentage.toFixed(1)}%
                           {resultA.housePurchase.isMonthlyAffordable ? ' ✓' : ' ✗'}
-                          <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '4px' }}>(max 35%)</span>
+                          <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '4px' }}>(max {constants.monthlyAffordabilityThreshold * 100}%)</span>
                         </td>
                       </tr>
                     </tbody>

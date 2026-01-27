@@ -98,10 +98,10 @@ export function analyzeHousePurchase(
     canAfford = false;
   }
 
-  // Check 3: Monthly affordability (30% rule)
+  // Check 3: Monthly affordability threshold
   if (!isMonthlyAffordable) {
     affordabilityIssues.push(
-      `Monthly repayment (${monthlyRepaymentPercentage.toFixed(1)}%) exceeds 30% threshold`
+      `Monthly repayment (${monthlyRepaymentPercentage.toFixed(1)}%) exceeds ${constants.monthlyAffordabilityThreshold * 100}% threshold`
     );
     canAfford = false;
   }
