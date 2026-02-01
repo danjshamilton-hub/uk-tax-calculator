@@ -35,10 +35,27 @@ export function analyzeHousePurchase(
   const combinedMonthlyTakeHome = combinedAnnualTakeHome / 12;
 
   // 2. Calculate mortgage capacity (4.5x rule)
-  const maxMortgageCapacity = calculateMaxMortgage(
-    combinedAnnualTakeHome,
-    constants.defaultMortgageMultiplier
-  );
+  // Option 1: Use manual override if provided
+  // Option 2: Use gross income if selected
+  // Option 3: Use take-home (default)
+  let maxMortgageCapacity: number;
+
+  if (inputs.mortgageMaxOverride && inputs.mortgageMaxOverride > 0) {
+    // Manual override takes precedence
+    maxMortgageCapacity = inputs.mortgageMaxOverride;
+  } else if (inputs.useGrossForMortgage) {
+    // Use gross income for 4.5x calculation
+    const yourGross = inputs.yourGrossSalary || 0;
+    const partnerGross = inputs.partnerGrossSalary || 0;
+    const combinedGross = yourGross + partnerGross;
+    maxMortgageCapacity = calculateMaxMortgage(combinedGross, constants.defaultMortgageMultiplier);
+  } else {
+    // Default: use take-home for 4.5x calculation
+    maxMortgageCapacity = calculateMaxMortgage(
+      combinedAnnualTakeHome,
+      constants.defaultMortgageMultiplier
+    );
+  }
 
   // 3. Calculate mortgage - always capped at max capacity
   // The minimum deposit based on user's percentage

@@ -53,6 +53,11 @@ export interface HousePurchaseInputs {
   // Mortgage terms
   mortgageInterestRate: number; // Annual %, e.g., 5.0
   mortgageTerm: number; // Years, e.g., 25
+
+  // Mortgage calculation options
+  useGrossForMortgage?: boolean; // If true, use gross income instead of take-home for 4.5x
+  mortgageMaxOverride?: number; // Manual override for max mortgage amount (0 = use calculated)
+  yourGrossSalary?: number; // Your gross salary (needed if useGrossForMortgage is true)
 }
 
 export interface CalculationResults {

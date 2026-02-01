@@ -74,6 +74,10 @@ function App() {
   const [mortgageInterestRate, setMortgageInterestRate] = useState(4.5);
   const [mortgageTerm, setMortgageTerm] = useState(25);
 
+  // Mortgage calculation options
+  const [useGrossForMortgage, setUseGrossForMortgage] = useState(false);
+  const [mortgageMaxOverride, setMortgageMaxOverride] = useState(0);
+
   // Build house purchase inputs (always enabled for house tab)
   const housePurchaseInputs: HousePurchaseInputs = {
     houseValuation,
@@ -86,6 +90,9 @@ function App() {
     movingCosts,
     mortgageInterestRate,
     mortgageTerm,
+    useGrossForMortgage,
+    mortgageMaxOverride: mortgageMaxOverride > 0 ? mortgageMaxOverride : undefined,
+    yourGrossSalary: grossSalary,
   };
 
   // Build Scenario A inputs
@@ -1089,7 +1096,11 @@ function App() {
             <h3 style={{ marginBottom: '12px', fontSize: '16px', color: '#92400E' }}>🏠 Mortgage Capacity</h3>
             <table style={{ width: '100%' }}>
               <tbody>
-                <CompareRow label="Max mortgage (4.5x take-home)" valueA={resultA.maxMortgageCapacity} valueB={resultB?.maxMortgageCapacity ?? null} />
+                <CompareRow
+                  label={`Max mortgage${mortgageMaxOverride > 0 ? ' (override)' : useGrossForMortgage ? ' (4.5x gross)' : ' (4.5x take-home)'}`}
+                  valueA={resultA.housePurchase?.maxMortgageCapacity ?? resultA.maxMortgageCapacity}
+                  valueB={resultB?.housePurchase?.maxMortgageCapacity ?? resultB?.maxMortgageCapacity ?? null}
+                />
               </tbody>
             </table>
             <div style={{ marginTop: '12px', fontSize: '13px', color: '#92400E' }}>
@@ -1228,6 +1239,44 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Mortgage Calculation Options */}
+            <div style={sectionStyle}>
+              <h2 style={sectionHeaderStyle}>⚙️ Mortgage Capacity Options</h2>
+              <div style={fieldStyle}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={useGrossForMortgage}
+                    onChange={(e) => setUseGrossForMortgage(e.target.checked)}
+                    style={{ width: '18px', height: '18px' }}
+                  />
+                  <span style={{ fontSize: '14px' }}>Use gross income for 4.5x calculation</span>
+                </label>
+                <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px', marginLeft: '26px' }}>
+                  {useGrossForMortgage
+                    ? `Using combined gross: ${formatCurrency(grossSalary + partnerGrossSalary)}`
+                    : 'Default: uses combined annual take-home pay'}
+                </div>
+              </div>
+              <div style={{ ...fieldStyle, marginTop: '12px' }}>
+                <label style={labelStyle}>Override Max Mortgage (£)</label>
+                <input
+                  type="number"
+                  value={mortgageMaxOverride || ''}
+                  onChange={(e) => setMortgageMaxOverride(safeNumber(e.target.value, 0))}
+                  style={inputStyle}
+                  placeholder="Leave empty to use calculated amount"
+                  min="0"
+                  step="10000"
+                />
+                <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                  {mortgageMaxOverride > 0
+                    ? `Using override: ${formatCurrency(mortgageMaxOverride)}`
+                    : 'Enter a value to override the 4.5x calculation'}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* House Purchase Results */}
@@ -1268,7 +1317,10 @@ function App() {
                         <td style={{ textAlign: 'right' }}>{formatCurrency(resultA.housePurchase.combinedAnnualTakeHome)}</td>
                       </tr>
                       <tr style={{ background: '#DBEAFE' }}>
-                        <td style={{ padding: '8px 0', fontWeight: 'bold' }}>Max mortgage (4.5x)</td>
+                        <td style={{ padding: '8px 0', fontWeight: 'bold' }}>
+                          Max mortgage
+                          {mortgageMaxOverride > 0 ? ' (override)' : useGrossForMortgage ? ' (4.5x gross)' : ' (4.5x take-home)'}
+                        </td>
                         <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>{formatCurrency(resultA.housePurchase.maxMortgageCapacity)}</td>
                       </tr>
                       <tr>
