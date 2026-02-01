@@ -12,11 +12,16 @@ export interface ScenarioInputs {
   employeePensionPercentage: number;
   employerPensionPercentage: number;
 
+  // Bonus
+  bonusAmount: number;
+  bonusSacrificePercentage: number; // 0-100% of bonus to sacrifice to pension
+
   // Company Car
   hasCompanyCar: boolean;
-  carSalarySacrifice: number;
+  carSalarySacrifice: number; // Annual amount (already pro-rated if partial year)
   carP11DValue: number;
   carBIKPercentage: number;
+  carBIKProRataFactor?: number; // 0-1, defaults to 1 for full year
 
   // Personal
   currentAge: number;
@@ -53,6 +58,9 @@ export interface HousePurchaseInputs {
 export interface CalculationResults {
   // Tax Calculations
   grossSalary: number;
+  bonusAmount: number;
+  bonusSacrificedToPension: number;
+  totalGrossIncome: number; // grossSalary + bonus (before sacrifice)
   employeePension: number;
   employerPension: number;
   carSalarySacrifice: number;
@@ -64,9 +72,18 @@ export interface CalculationResults {
   bikTax: number;
   adjustedNetIncome: number;
 
+  // Tax Rates
+  effectiveTaxRate: number; // Total deductions / gross income (percentage)
+  marginalTaxRate: number; // Rate on the next £1 (percentage)
+  marginalNIRate: number; // NI rate on next £1 (percentage)
+  combinedMarginalRate: number; // Tax + NI on next £1
+
+  // Headroom to key thresholds
+  headroom: ThresholdHeadroom[];
+
   // Benefits
   childBenefitCharge: number;
-  taxFreeChildcareLoss: number;
+  taxFreeChildcareBenefit: number;
   freeChildcareLoss: number;
 
   // Take-home
@@ -86,6 +103,15 @@ export interface CalculationResults {
 
   // Cliff Edge Warnings
   cliffEdgeWarnings: string[];
+}
+
+export interface ThresholdHeadroom {
+  name: string;
+  threshold: number;
+  currentValue: number;
+  headroom: number; // Positive = below threshold, negative = above
+  marginalRateIfExceeded?: number;
+  warning?: string;
 }
 
 export interface HousePurchaseResults {

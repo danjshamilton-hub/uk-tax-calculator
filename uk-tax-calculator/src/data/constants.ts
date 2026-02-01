@@ -6,7 +6,7 @@ export const constants = {
   defaultMortgageInterestRate: 5.0, // percentage
   defaultMortgageTerm: 25, // years
   defaultDepositPercentage: 15,
-  monthlyAffordabilityThreshold: 0.30, // 30% of monthly take-home
+  monthlyAffordabilityThreshold: 0.3, // 30% of monthly take-home
 
   // Investment & Pension
   defaultInvestmentReturn: 5.0, // annual percentage
@@ -17,4 +17,11 @@ export const constants = {
   // UI
   minDepositPercentage: 5,
   maxDepositPercentage: 25,
+
+  // Projections
+  defaultProjectionYears: 5,
+  minProjectionYears: 1,
+  maxProjectionYears: 10,
+  defaultSalaryIncrease: 3.0, // annual percentage
+  defaultStartingTaxYear: 2025,
 };

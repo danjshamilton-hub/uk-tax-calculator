@@ -4,6 +4,7 @@ import type { ScenarioInputs, HousePurchaseInputs, CalculationResults } from './
 import type { TaxRegion } from './data/taxRates2025';
 import { formatCurrency } from './lib/utils/formatters';
 import { constants } from './data/constants';
+import { ProjectionsTab } from './components/ProjectionsTab';
 
 // Helper to safely parse numeric input and prevent NaN
 function safeNumber(value: string | number, fallback: number = 0): number {
@@ -13,7 +14,7 @@ function safeNumber(value: string | number, fallback: number = 0): number {
 
 function App() {
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'salary' | 'house'>('salary');
+  const [activeTab, setActiveTab] = useState<'salary' | 'house' | 'projections'>('salary');
 
   // Comparison mode
   const [compareMode, setCompareMode] = useState(false);
@@ -53,6 +54,14 @@ function App() {
   const [usesTaxFreeChildcareA, setUsesTaxFreeChildcareA] = useState(true);
   const [usesTaxFreeChildcareB, setUsesTaxFreeChildcareB] = useState(true);
 
+  // Bonus inputs (Scenario A)
+  const [bonusAmount, setBonusAmount] = useState(0);
+  const [bonusSacrificePercentage, setBonusSacrificePercentage] = useState(0);
+
+  // Bonus inputs (Scenario B)
+  const [bonusAmountB, setBonusAmountB] = useState(0);
+  const [bonusSacrificePercentageB, setBonusSacrificePercentageB] = useState(0);
+
   // House purchase inputs
   const [houseValuation, setHouseValuation] = useState(300000);
   const [purchasePrice, setPurchasePrice] = useState(300000);
@@ -86,6 +95,8 @@ function App() {
     grossSalary,
     employeePensionPercentage,
     employerPensionPercentage,
+    bonusAmount,
+    bonusSacrificePercentage,
     hasCompanyCar,
     carSalarySacrifice: hasCompanyCar ? carSalarySacrifice * 12 : 0,
     carP11DValue,
@@ -103,6 +114,8 @@ function App() {
     name: 'Scenario B',
     grossSalary: grossSalaryB,
     employeePensionPercentage: employeePensionPercentageB,
+    bonusAmount: bonusAmountB,
+    bonusSacrificePercentage: bonusSacrificePercentageB,
     hasCompanyCar: hasCompanyCarB,
     carSalarySacrifice: hasCompanyCarB ? carSalarySacrificeB * 12 : 0,
     carP11DValue: carP11DValueB,
@@ -119,11 +132,11 @@ function App() {
       ? result.annualTakeHome
       : result.annualTakeHome + result.childBenefitCharge;
     const adjustedMonthly = adjustedAnnual / 12;
-    const effectiveMonthly = usesTaxFreeChildcare && result.taxFreeChildcareLoss > 0
-      ? adjustedMonthly - result.taxFreeChildcareLoss / 12
-      : adjustedMonthly;
-    const hasTaxFreeChildcareLoss = usesTaxFreeChildcare && result.taxFreeChildcareLoss > 0;
-    return { effectiveCharge, adjustedAnnual, adjustedMonthly, effectiveMonthly, hasTaxFreeChildcareLoss };
+    // Tax-Free Childcare is now a benefit - add it if eligible and using the scheme
+    const taxFreeChildcareBenefitAmount = usesTaxFreeChildcare ? result.taxFreeChildcareBenefit : 0;
+    const effectiveMonthly = adjustedMonthly + (taxFreeChildcareBenefitAmount / 12);
+    const hasTaxFreeChildcareBenefit = usesTaxFreeChildcare && result.taxFreeChildcareBenefit > 0;
+    return { effectiveCharge, adjustedAnnual, adjustedMonthly, effectiveMonthly, hasTaxFreeChildcareBenefit, taxFreeChildcareBenefitAmount };
   };
 
   const adjA = getAdjustedValues(resultA, claimsChildBenefitA, usesTaxFreeChildcareA);
@@ -235,6 +248,9 @@ function App() {
         </button>
         <button style={tabStyle(activeTab === 'house')} onClick={() => setActiveTab('house')}>
           🏠 House Purchase
+        </button>
+        <button style={tabStyle(activeTab === 'projections')} onClick={() => setActiveTab('projections')}>
+          📈 Projections
         </button>
       </div>
 
@@ -646,6 +662,136 @@ function App() {
             )}
           </div>
 
+          {/* Bonus */}
+          <div style={sectionStyle}>
+            <h2 style={sectionHeaderStyle}>🎁 Bonus</h2>
+            {compareMode ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {/* Scenario A Bonus */}
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Scenario A</div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Bonus Amount (£)</label>
+                    <input
+                      type="number"
+                      value={bonusAmount}
+                      onChange={(e) => setBonusAmount(safeNumber(e.target.value, 0))}
+                      style={inputStyle}
+                    />
+                  </div>
+                  {bonusAmount > 0 && (
+                    <div style={fieldStyle}>
+                      <label style={labelStyle}>Sacrifice to Pension (%)</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="10"
+                        value={bonusSacrificePercentage}
+                        onChange={(e) => setBonusSacrificePercentage(safeNumber(e.target.value, 0))}
+                        style={{ width: '100%' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6B7280' }}>
+                        <span>0%</span>
+                        <span style={{ fontWeight: 'bold' }}>{bonusSacrificePercentage}%</span>
+                        <span>100%</span>
+                      </div>
+                      {bonusSacrificePercentage > 0 && (
+                        <div style={{ background: '#F0FDF4', padding: '6px', borderRadius: '4px', marginTop: '4px', fontSize: '11px' }}>
+                          <div style={{ color: '#166534' }}>
+                            Sacrificing: {formatCurrency(bonusAmount * bonusSacrificePercentage / 100)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* Scenario B Bonus */}
+                <div>
+                  <div style={{ fontSize: '12px', color: '#2563EB', marginBottom: '4px' }}>Scenario B</div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Bonus Amount (£)</label>
+                    <input
+                      type="number"
+                      value={bonusAmountB}
+                      onChange={(e) => setBonusAmountB(safeNumber(e.target.value, 0))}
+                      style={{ ...inputStyle, borderColor: '#2563EB' }}
+                    />
+                  </div>
+                  {bonusAmountB > 0 && (
+                    <div style={fieldStyle}>
+                      <label style={labelStyle}>Sacrifice to Pension (%)</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="10"
+                        value={bonusSacrificePercentageB}
+                        onChange={(e) => setBonusSacrificePercentageB(safeNumber(e.target.value, 0))}
+                        style={{ width: '100%' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6B7280' }}>
+                        <span>0%</span>
+                        <span style={{ fontWeight: 'bold' }}>{bonusSacrificePercentageB}%</span>
+                        <span>100%</span>
+                      </div>
+                      {bonusSacrificePercentageB > 0 && (
+                        <div style={{ background: '#F0FDF4', padding: '6px', borderRadius: '4px', marginTop: '4px', fontSize: '11px' }}>
+                          <div style={{ color: '#166534' }}>
+                            Sacrificing: {formatCurrency(bonusAmountB * bonusSacrificePercentageB / 100)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Bonus Amount (£)</label>
+                  <input
+                    type="number"
+                    value={bonusAmount}
+                    onChange={(e) => setBonusAmount(safeNumber(e.target.value, 0))}
+                    style={inputStyle}
+                  />
+                </div>
+                {bonusAmount > 0 && (
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Sacrifice to Pension: {bonusSacrificePercentage}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="10"
+                      value={bonusSacrificePercentage}
+                      onChange={(e) => setBonusSacrificePercentage(safeNumber(e.target.value, 0))}
+                      style={{ width: '100%' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6B7280' }}>
+                      <span>0%</span>
+                      <span>100%</span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                      Saves tax and NI, reduces ANI
+                    </span>
+                    {bonusSacrificePercentage > 0 && (
+                      <div style={{ background: '#F0FDF4', padding: '8px', borderRadius: '4px', marginTop: '8px', fontSize: '12px' }}>
+                        <div style={{ color: '#166534', fontWeight: 'bold' }}>
+                          Sacrificing: {formatCurrency(bonusAmount * bonusSacrificePercentage / 100)} → Tax saved: ~{formatCurrency(bonusAmount * bonusSacrificePercentage / 100 * (resultA.combinedMarginalRate / 100))}
+                        </div>
+                        <div style={{ color: '#6B7280' }}>
+                          Added to pension pot instead
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
         </div>
 
         {/* Results */}
@@ -669,6 +815,9 @@ function App() {
               </thead>
               <tbody>
                 <CompareRow label="Gross Salary" valueA={resultA.grossSalary} valueB={resultB?.grossSalary ?? null} />
+                {resultA.bonusAmount > 0 && (
+                  <CompareRow label={resultA.bonusSacrificedToPension > 0 ? "Bonus (sacrificed)" : "Bonus"} valueA={resultA.bonusAmount} valueB={resultB?.bonusAmount ?? null} />
+                )}
                 <CompareRow label="Employee Pension" valueA={resultA.employeePension} valueB={resultB?.employeePension ?? null} isDeduction />
                 {(resultA.carSalarySacrifice > 0 || (resultB?.carSalarySacrifice ?? 0) > 0) && (
                   <CompareRow label="Car Salary Sacrifice" valueA={resultA.carSalarySacrifice} valueB={resultB?.carSalarySacrifice ?? null} isDeduction />
@@ -781,40 +930,40 @@ function App() {
                     </>
                   )}
                 </tr>
-                {(adjA.hasTaxFreeChildcareLoss || (adjB?.hasTaxFreeChildcareLoss)) && (
+                {(adjA.hasTaxFreeChildcareBenefit || (adjB?.hasTaxFreeChildcareBenefit)) && (
                   <>
-                    <tr style={{ background: '#FEF3C7' }}>
-                      <td style={{ padding: '6px 0', color: '#92400E' }}>Tax-Free Childcare Loss (monthly)</td>
-                      <td style={{ textAlign: 'right', color: adjA.hasTaxFreeChildcareLoss ? '#92400E' : '#6B7280' }}>
-                        {adjA.hasTaxFreeChildcareLoss ? `-${formatCurrency(resultA.taxFreeChildcareLoss / 12)}` : '-'}
+                    <tr style={{ background: '#DCFCE7' }}>
+                      <td style={{ padding: '6px 0', color: '#166534' }}>Tax-Free Childcare Benefit (monthly)</td>
+                      <td style={{ textAlign: 'right', color: adjA.hasTaxFreeChildcareBenefit ? '#166534' : '#6B7280' }}>
+                        {adjA.hasTaxFreeChildcareBenefit ? `+${formatCurrency(adjA.taxFreeChildcareBenefitAmount / 12)}` : '-'}
                       </td>
                       {compareMode && resultB && adjB && (
                         <>
-                          <td style={{ textAlign: 'right', color: adjB.hasTaxFreeChildcareLoss ? '#92400E' : '#6B7280' }}>
-                            {adjB.hasTaxFreeChildcareLoss ? `-${formatCurrency(resultB.taxFreeChildcareLoss / 12)}` : '-'}
+                          <td style={{ textAlign: 'right', color: adjB.hasTaxFreeChildcareBenefit ? '#166534' : '#6B7280' }}>
+                            {adjB.hasTaxFreeChildcareBenefit ? `+${formatCurrency(adjB.taxFreeChildcareBenefitAmount / 12)}` : '-'}
                           </td>
                           <td style={{ textAlign: 'right', color: '#6B7280' }}></td>
                         </>
                       )}
                     </tr>
-                    <tr style={{ fontWeight: 'bold', background: '#FEF3C7' }}>
-                      <td style={{ padding: '6px 0', color: '#92400E' }}>Effective Annual Cash</td>
-                      <td style={{ textAlign: 'right', color: '#92400E', fontSize: '16px' }}>{formatCurrency(adjA.effectiveMonthly * 12)}</td>
+                    <tr style={{ fontWeight: 'bold', background: '#DCFCE7' }}>
+                      <td style={{ padding: '6px 0', color: '#166534' }}>Effective Annual Cash</td>
+                      <td style={{ textAlign: 'right', color: '#166534', fontSize: '16px' }}>{formatCurrency(adjA.effectiveMonthly * 12)}</td>
                       {compareMode && adjB && (
                         <>
-                          <td style={{ textAlign: 'right', color: '#92400E', fontSize: '16px' }}>{formatCurrency(adjB.effectiveMonthly * 12)}</td>
+                          <td style={{ textAlign: 'right', color: '#166534', fontSize: '16px' }}>{formatCurrency(adjB.effectiveMonthly * 12)}</td>
                           <td style={{ textAlign: 'right', color: (adjB.effectiveMonthly - adjA.effectiveMonthly) * 12 > 0 ? '#059669' : '#DC2626' }}>
                             {(adjB.effectiveMonthly - adjA.effectiveMonthly) * 12 > 0 ? '+' : ''}{formatCurrency((adjB.effectiveMonthly - adjA.effectiveMonthly) * 12)}
                           </td>
                         </>
                       )}
                     </tr>
-                    <tr style={{ background: '#FEF3C7' }}>
-                      <td style={{ padding: '6px 0', color: '#92400E' }}>Effective Monthly Cash</td>
-                      <td style={{ textAlign: 'right', color: '#92400E' }}>{formatCurrency(adjA.effectiveMonthly)}</td>
+                    <tr style={{ background: '#DCFCE7' }}>
+                      <td style={{ padding: '6px 0', color: '#166534' }}>Effective Monthly Cash</td>
+                      <td style={{ textAlign: 'right', color: '#166534' }}>{formatCurrency(adjA.effectiveMonthly)}</td>
                       {compareMode && adjB && (
                         <>
-                          <td style={{ textAlign: 'right', color: '#92400E' }}>{formatCurrency(adjB.effectiveMonthly)}</td>
+                          <td style={{ textAlign: 'right', color: '#166534' }}>{formatCurrency(adjB.effectiveMonthly)}</td>
                           <td style={{ textAlign: 'right', color: adjB.effectiveMonthly - adjA.effectiveMonthly > 0 ? '#059669' : '#DC2626' }}>
                             {adjB.effectiveMonthly - adjA.effectiveMonthly > 0 ? '+' : ''}{formatCurrency(adjB.effectiveMonthly - adjA.effectiveMonthly)}
                           </td>
@@ -829,6 +978,98 @@ function App() {
             <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #D1D5DB', fontSize: '13px', color: '#6B7280' }}>
               <div>ANI: {formatCurrency(resultA.adjustedNetIncome)}{compareMode && resultB && ` → ${formatCurrency(resultB.adjustedNetIncome)}`}</div>
             </div>
+          </div>
+
+          {/* Tax Rates & Headroom */}
+          <div style={{ background: '#F3E8FF', padding: '20px', borderRadius: '8px', marginTop: '16px' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '16px', color: '#7C3AED' }}>📊 Tax Rates</h3>
+            {compareMode && resultB ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Scenario A */}
+                <div style={{ background: '#EDE9FE', padding: '12px', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '8px', fontWeight: '600' }}>Scenario A</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6B7280' }}>Effective</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#7C3AED' }}>{resultA.effectiveTaxRate.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6B7280' }}>Marginal</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#DC2626' }}>{resultA.combinedMarginalRate}%</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#6B7280' }}>
+                    Tax {resultA.marginalTaxRate}% + NI {resultA.marginalNIRate}%
+                  </div>
+                </div>
+                {/* Scenario B */}
+                <div style={{ background: '#DBEAFE', padding: '12px', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '12px', color: '#2563EB', marginBottom: '8px', fontWeight: '600' }}>Scenario B</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6B7280' }}>Effective</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#7C3AED' }}>{resultB.effectiveTaxRate.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#6B7280' }}>Marginal</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#DC2626' }}>{resultB.combinedMarginalRate}%</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#6B7280' }}>
+                    Tax {resultB.marginalTaxRate}% + NI {resultB.marginalNIRate}%
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Effective Tax Rate</div>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7C3AED' }}>
+                    {resultA.effectiveTaxRate.toFixed(1)}%
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6B7280' }}>
+                    Total deductions as % of gross
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Marginal Rate</div>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#DC2626' }}>
+                    {resultA.combinedMarginalRate}%
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6B7280' }}>
+                    Tax {resultA.marginalTaxRate}% + NI {resultA.marginalNIRate}%
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Headroom to thresholds */}
+            {resultA.headroom.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #E9D5FF' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#7C3AED', marginBottom: '8px' }}>
+                  Headroom to Key Thresholds
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {resultA.headroom.filter(h => h.headroom > 0).slice(0, 4).map((h, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: '#6B7280' }}>{h.name}</span>
+                      <span style={{ fontWeight: '500', color: h.headroom < 5000 ? '#DC2626' : '#059669' }}>
+                        {formatCurrency(h.headroom)} left
+                        {h.marginalRateIfExceeded && <span style={{ color: '#6B7280' }}> (then ~{h.marginalRateIfExceeded}%)</span>}
+                      </span>
+                    </div>
+                  ))}
+                  {resultA.headroom.filter(h => h.headroom <= 0).slice(0, 2).map((h, idx) => (
+                    <div key={`over-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#DC2626' }}>
+                      <span>{h.name}</span>
+                      <span style={{ fontWeight: '500' }}>
+                        {formatCurrency(Math.abs(h.headroom))} over {h.warning && `- ${h.warning}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pension Projections */}
@@ -1136,6 +1377,20 @@ function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Projections Tab */}
+      {activeTab === 'projections' && (
+        <ProjectionsTab
+          baseSalary={grossSalary}
+          taxRegion={taxRegion}
+          employeePensionPercentage={employeePensionPercentage}
+          employerPensionPercentage={employerPensionPercentage}
+          currentAge={currentAge}
+          retirementAge={retirementAge}
+          hasChildren={hasChildren}
+          numberOfChildren={numberOfChildren}
+        />
       )}
     </div>
   );

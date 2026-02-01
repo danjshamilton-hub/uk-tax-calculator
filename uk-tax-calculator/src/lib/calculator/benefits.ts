@@ -49,10 +49,10 @@ export function calculateChildBenefitCharge(
 }
 
 /**
- * Calculate Tax-Free Childcare loss
- * Loses £2k per child if ANI exceeds £100k
+ * Calculate Tax-Free Childcare benefit
+ * £2k per child government contribution if ANI is at or below £100k
  */
-export function calculateTaxFreeChildcareLoss(
+export function calculateTaxFreeChildcareBenefit(
   adjustedNetIncome: number,
   hasChildren: boolean,
   numberOfChildren: number
@@ -61,7 +61,8 @@ export function calculateTaxFreeChildcareLoss(
 
   const { threshold, governmentContributionPerChild } = benefitsThresholds.taxFreeChildcare;
 
-  if (adjustedNetIncome > threshold) {
+  // Eligible for benefit if ANI is at or below threshold
+  if (adjustedNetIncome <= threshold) {
     return governmentContributionPerChild * numberOfChildren;
   }
 
@@ -94,7 +95,7 @@ export function calculate30HoursFreeChildcareLoss(
 }
 
 /**
- * Calculate total benefits impact (charges and losses)
+ * Calculate total benefits impact (charges, losses, and benefits)
  */
 export function calculateTotalBenefitsImpact(
   adjustedNetIncome: number,
@@ -103,7 +104,7 @@ export function calculateTotalBenefitsImpact(
   region: TaxRegion
 ): {
   childBenefitCharge: number;
-  taxFreeChildcareLoss: number;
+  taxFreeChildcareBenefit: number;
   freeChildcareLoss: number;
   totalImpact: number;
 } {
@@ -112,7 +113,7 @@ export function calculateTotalBenefitsImpact(
     hasChildren,
     numberOfChildren
   );
-  const taxFreeChildcareLoss = calculateTaxFreeChildcareLoss(
+  const taxFreeChildcareBenefit = calculateTaxFreeChildcareBenefit(
     adjustedNetIncome,
     hasChildren,
     numberOfChildren
@@ -126,8 +127,8 @@ export function calculateTotalBenefitsImpact(
 
   return {
     childBenefitCharge,
-    taxFreeChildcareLoss,
+    taxFreeChildcareBenefit,
     freeChildcareLoss,
-    totalImpact: childBenefitCharge + taxFreeChildcareLoss + freeChildcareLoss,
+    totalImpact: childBenefitCharge - taxFreeChildcareBenefit + freeChildcareLoss,
   };
 }
