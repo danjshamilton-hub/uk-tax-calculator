@@ -183,8 +183,12 @@ export function calculateProjectionForScenario(
       singleYearResult.bikTax +
       singleYearResult.childBenefitCharge;
 
+    // Include tax-free childcare benefit in effective take-home
+    const effectiveAnnualTakeHome = singleYearResult.annualTakeHome + singleYearResult.taxFreeChildcareBenefit;
+    const effectiveMonthlyTakeHome = effectiveAnnualTakeHome / 12;
+
     // Update running totals
-    cumulativeTakeHome += singleYearResult.annualTakeHome;
+    cumulativeTakeHome += effectiveAnnualTakeHome;
     cumulativeTaxPaid += totalTaxThisYear;
     cumulativePensionContributions += singleYearResult.totalPensionContribution;
 
@@ -212,8 +216,8 @@ export function calculateProjectionForScenario(
       taxFreeChildcareBenefit: singleYearResult.taxFreeChildcareBenefit,
       totalTaxPaid: totalTaxThisYear,
 
-      annualTakeHome: singleYearResult.annualTakeHome,
-      monthlyTakeHome: singleYearResult.monthlyTakeHome,
+      annualTakeHome: effectiveAnnualTakeHome,
+      monthlyTakeHome: effectiveMonthlyTakeHome,
       adjustedNetIncome: singleYearResult.adjustedNetIncome,
 
       effectiveTaxRate: singleYearResult.effectiveTaxRate,
@@ -363,25 +367,38 @@ function formatCurrencyShort(value: number): string {
 }
 
 /**
+ * Defaults for initializing year scenario configs from Salary tab values
+ */
+export interface ScenarioDefaults {
+  employeePensionPercentage: number;
+  numberOfChildrenForChildcare?: number;
+  bonusAmount?: number;
+  bonusSacrificePercentage?: number;
+  companyCar?: {
+    hasCompanyCar: boolean;
+    carSalarySacrifice: number;
+    carP11DValue: number;
+    carBIKPercentage: number;
+  };
+}
+
+/**
  * Create default year scenario config
  */
-export function createDefaultYearScenarioConfig(
-  employeePensionPercentage: number,
-  numberOfChildrenForChildcare: number = 0
-): YearScenarioConfig {
+export function createDefaultYearScenarioConfig(defaults: ScenarioDefaults): YearScenarioConfig {
   return {
-    employeePensionPercentage,
-    bonusAmount: 0,
-    bonusSacrificePercentage: 0,
+    employeePensionPercentage: defaults.employeePensionPercentage,
+    bonusAmount: defaults.bonusAmount ?? 0,
+    bonusSacrificePercentage: defaults.bonusSacrificePercentage ?? 0,
     companyCar: {
-      hasCompanyCar: false,
-      carSalarySacrifice: 500,
-      carP11DValue: 35000,
-      carBIKPercentage: 2,
+      hasCompanyCar: defaults.companyCar?.hasCompanyCar ?? false,
+      carSalarySacrifice: defaults.companyCar?.carSalarySacrifice ?? 500,
+      carP11DValue: defaults.companyCar?.carP11DValue ?? 35000,
+      carBIKPercentage: defaults.companyCar?.carBIKPercentage ?? 2,
       startMonth: 1,
       endMonth: 12,
     },
-    numberOfChildrenForChildcare,
+    numberOfChildrenForChildcare: defaults.numberOfChildrenForChildcare ?? 0,
   };
 }
 
@@ -390,13 +407,12 @@ export function createDefaultYearScenarioConfig(
  */
 export function createDefaultYearConfigs(
   years: number,
-  employeePensionPercentageA: number,
-  employeePensionPercentageB: number,
-  numberOfChildrenForChildcare: number = 0
+  defaultsA: ScenarioDefaults,
+  defaultsB: ScenarioDefaults
 ): YearConfig[] {
   return Array.from({ length: years }, (_, i) => ({
     year: i + 1,
-    scenarioA: createDefaultYearScenarioConfig(employeePensionPercentageA, numberOfChildrenForChildcare),
-    scenarioB: createDefaultYearScenarioConfig(employeePensionPercentageB, numberOfChildrenForChildcare),
+    scenarioA: createDefaultYearScenarioConfig(defaultsA),
+    scenarioB: createDefaultYearScenarioConfig(defaultsB),
   }));
 }

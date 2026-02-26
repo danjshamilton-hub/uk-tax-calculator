@@ -7,34 +7,20 @@ interface MonthPickerProps {
   label: string;
   value: number;
   onChange: (month: number) => void;
-  style?: React.CSSProperties;
+  className?: string;
 }
 
-export function MonthPicker({ label, value, onChange, style }: MonthPickerProps) {
-  const selectStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 12px',
-    border: '1px solid #D1D5DB',
-    borderRadius: '6px',
-    fontSize: '14px',
-    boxSizing: 'border-box' as const,
-    ...style,
-  };
-
+export function MonthPicker({ label, value, onChange, className = '' }: MonthPickerProps) {
   return (
-    <div style={{ marginBottom: '8px' }}>
-      <label
-        style={{
-          display: 'block',
-          marginBottom: '4px',
-          fontWeight: 500,
-          color: '#374151',
-          fontSize: '14px',
-        }}
-      >
+    <div className="mb-2">
+      <label className="block mb-1 font-medium text-gray-700 text-sm">
         {label}
       </label>
-      <select value={value} onChange={(e) => onChange(Number(e.target.value))} style={selectStyle}>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={`w-full px-3 py-2 border border-gray-300 rounded-md text-sm ${className}`}
+      >
         {taxYearMonths.map((m) => (
           <option key={m.value} value={m.value}>
             {m.label}

@@ -24,4 +24,11 @@ export const constants = {
   maxProjectionYears: 10,
   defaultSalaryIncrease: 3.0, // annual percentage
   defaultStartingTaxYear: 2025,
+
+  // Budget
+  defaultBudgetProjectionYears: 3,
+  minBudgetProjectionYears: 1,
+  maxBudgetProjectionYears: 5,
+  defaultJointContributionPercent: 70,
+  defaultSavingsGrowthRate: 5.0, // annual % for investment growth
 };

@@ -57,15 +57,17 @@ export function analyzeHousePurchase(
     );
   }
 
-  // 3. Calculate mortgage - always capped at max capacity
-  // The minimum deposit based on user's percentage
-  const minimumDepositAmount = inputs.purchasePrice * (inputs.depositPercentage / 100);
-  // Ideal mortgage if no capacity limit (based on valuation to avoid negative equity)
-  const idealMortgage = inputs.houseValuation - minimumDepositAmount;
-  // Mortgage is capped at max capacity - if limited, buyer needs more cash
+  // 3. Calculate mortgage based on LTV (Loan-to-Value)
+  // Lenders use the LOWER of valuation or purchase price as the lending basis
+  // This protects against negative equity
+  const lendingBasis = Math.min(inputs.houseValuation, inputs.purchasePrice);
+  // Mortgage is (100% - deposit%) of the lending basis
+  const ltvPercentage = (100 - inputs.depositPercentage) / 100;
+  const idealMortgage = lendingBasis * ltvPercentage;
+  // Mortgage is capped at max borrowing capacity
   const mortgageNeeded = Math.min(Math.max(idealMortgage, 0), maxMortgageCapacity);
-  // This is the deposit shown (minimum requested), but actual cash needed may be higher
-  const depositAmount = minimumDepositAmount;
+  // Deposit shown is based on lending basis
+  const depositAmount = lendingBasis * (inputs.depositPercentage / 100);
 
   // 4. Calculate monthly repayment (based on capped mortgage)
   const monthlyRepayment = calculateMonthlyRepayment(
