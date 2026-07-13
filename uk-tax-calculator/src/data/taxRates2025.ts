@@ -33,9 +33,9 @@ export const scotlandTaxConfig: TaxConfig = {
   personalAllowanceTaperEnd: 125140,
   bands: [
     { min: 0, max: 12570, rate: 0 }, // Personal allowance
-    { min: 12571, max: 14876, rate: 19 }, // Starter rate
-    { min: 14877, max: 26561, rate: 20 }, // Basic rate
-    { min: 26562, max: 43662, rate: 21 }, // Intermediate rate
+    { min: 12571, max: 15397, rate: 19 }, // Starter rate
+    { min: 15398, max: 27491, rate: 20 }, // Basic rate
+    { min: 27492, max: 43662, rate: 21 }, // Intermediate rate
     { min: 43663, max: 75000, rate: 42 }, // Higher rate
     { min: 75001, max: 125140, rate: 45 }, // Advanced rate
     { min: 125140, max: null, rate: 48 }, // Top rate

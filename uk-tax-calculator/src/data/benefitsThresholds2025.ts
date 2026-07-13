@@ -5,8 +5,8 @@ export const benefitsThresholds = {
   childBenefit: {
     taperStart: 60000,
     taperEnd: 80000,
-    annualBenefitFirstChild: 1248, // £24 per week
-    annualBenefitAdditionalChild: 828, // £15.90 per week
+    annualBenefitFirstChild: 1354.6, // £26.05 per week (2025/26)
+    annualBenefitAdditionalChild: 897, // £17.25 per week (2025/26)
   },
 
   // Tax-Free Childcare

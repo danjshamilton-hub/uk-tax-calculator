@@ -1,6 +1,7 @@
 // Core type definitions for tax calculator scenarios
 
 import type { TaxRegion } from '../data/taxRates2025';
+import type { StudentLoanPlan } from '../data/studentLoanRates2025';
 
 export interface ScenarioInputs {
   // Basic Info
@@ -23,13 +24,21 @@ export interface ScenarioInputs {
   carBIKPercentage: number;
   carBIKProRataFactor?: number; // 0-1, defaults to 1 for full year
 
+  // Cash car allowance (annual) - paid as salary, taxed and NI'd normally, non-pensionable
+  carAllowance?: number;
+
   // Personal
   currentAge: number;
   retirementAge: number;
 
+  // Student Loan
+  studentLoanPlan?: StudentLoanPlan; // defaults to 'none'
+  hasPostgradLoan?: boolean;
+
   // Childcare
   hasChildren: boolean;
   numberOfChildren: number;
+  claimsChildBenefit?: boolean; // defaults to true when hasChildren
 
   // House Purchase (optional)
   housePurchase?: HousePurchaseInputs;
@@ -65,7 +74,8 @@ export interface CalculationResults {
   grossSalary: number;
   bonusAmount: number;
   bonusSacrificedToPension: number;
-  totalGrossIncome: number; // grossSalary + bonus (before sacrifice)
+  carAllowance: number; // annual cash car allowance (taxed as salary)
+  totalGrossIncome: number; // grossSalary + bonus + car allowance (before sacrifice)
   employeePension: number;
   employerPension: number;
   carSalarySacrifice: number;
@@ -75,19 +85,24 @@ export interface CalculationResults {
   incomeTax: number;
   nationalInsurance: number;
   bikTax: number;
+  studentLoanRepayment: number; // undergraduate plan repayment
+  postgradLoanRepayment: number; // postgraduate loan repayment
   adjustedNetIncome: number;
 
   // Tax Rates
   effectiveTaxRate: number; // Total deductions / gross income (percentage)
   marginalTaxRate: number; // Rate on the next £1 (percentage)
   marginalNIRate: number; // NI rate on next £1 (percentage)
-  combinedMarginalRate: number; // Tax + NI on next £1
+  marginalStudentLoanRate: number; // Student loan rate on next £1 (percentage)
+  combinedMarginalRate: number; // Tax + NI + student loan (+ CB taper) on next £1
 
   // Headroom to key thresholds
   headroom: ThresholdHeadroom[];
 
   // Benefits
-  childBenefitCharge: number;
+  childBenefitReceived: number; // annual child benefit paid (0 if not claiming)
+  childBenefitCharge: number; // HICBC clawback (0 if not claiming)
+  netChildBenefit: number; // received - charge
   taxFreeChildcareBenefit: number;
   freeChildcareLoss: number;
 

@@ -163,6 +163,8 @@ export function calculateProjectionForScenario(
       carBIKProRataFactor: carProRata, // Apply same pro-rata as salary sacrifice
       currentAge: inputs.currentAge + year - 1,
       retirementAge: inputs.retirementAge,
+      studentLoanPlan: inputs.studentLoanPlan,
+      hasPostgradLoan: inputs.hasPostgradLoan,
       hasChildren: hasChildrenForChildcare,
       numberOfChildren: scenarioConfig.numberOfChildrenForChildcare,
     };
@@ -177,10 +179,12 @@ export function calculateProjectionForScenario(
     );
 
     // Calculate total tax paid this year
+    // (bikTax is already included in incomeTax, so it is not added again)
     const totalTaxThisYear =
       singleYearResult.incomeTax +
       singleYearResult.nationalInsurance +
-      singleYearResult.bikTax +
+      singleYearResult.studentLoanRepayment +
+      singleYearResult.postgradLoanRepayment +
       singleYearResult.childBenefitCharge;
 
     // Include tax-free childcare benefit in effective take-home

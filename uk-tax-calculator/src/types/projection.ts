@@ -1,6 +1,7 @@
 // Multi-year projection type definitions
 
 import type { TaxRegion } from '../data/taxRates2025';
+import type { StudentLoanPlan } from '../data/studentLoanRates2025';
 
 // ============================================
 // INPUT TYPES
@@ -74,6 +75,10 @@ export interface ProjectionInputs {
   // Personal
   currentAge: number;
   retirementAge: number;
+
+  // Student Loan (shared across scenarios and years)
+  studentLoanPlan?: StudentLoanPlan;
+  hasPostgradLoan?: boolean;
 
   // Starting pension pot (for accumulation calculations)
   existingPensionPot: number;

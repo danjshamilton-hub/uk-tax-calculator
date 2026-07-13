@@ -8,6 +8,7 @@ import type {
   YearCompanyCarConfig,
 } from '../types/projection';
 import type { TaxRegion } from '../data/taxRates2025';
+import type { StudentLoanPlan } from '../data/studentLoanRates2025';
 import {
   calculateProjectionComparison,
   createDefaultYearConfigs,
@@ -33,6 +34,8 @@ interface ProjectionsTabProps {
   carSalarySacrifice: number;
   carP11DValue: number;
   carBIKPercentage: number;
+  studentLoanPlan: StudentLoanPlan;
+  hasPostgradLoan: boolean;
 }
 
 const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-[13px] box-border focus:outline-none focus:ring-1 focus:ring-blue-500';
@@ -55,6 +58,8 @@ export function ProjectionsTab({
   carSalarySacrifice,
   carP11DValue,
   carBIKPercentage,
+  studentLoanPlan,
+  hasPostgradLoan,
 }: ProjectionsTabProps) {
   const [projectionYears, setProjectionYears] = useState(constants.defaultProjectionYears);
   const [startingTaxYear, setStartingTaxYear] = useState(constants.defaultStartingTaxYear);
@@ -158,12 +163,15 @@ export function ProjectionsTab({
     employerPensionPercentage,
     currentAge,
     retirementAge,
+    studentLoanPlan,
+    hasPostgradLoan,
     existingPensionPot,
     yearConfigs,
   }), [
     taxRegion, projectionYears, startingTaxYear, baseSalary,
     defaultSalaryIncrease, defaultPensionA, employerPensionPercentage,
-    currentAge, retirementAge, existingPensionPot, yearConfigs,
+    currentAge, retirementAge, studentLoanPlan, hasPostgradLoan,
+    existingPensionPot, yearConfigs,
   ]);
 
   const comparison = useMemo(() => calculateProjectionComparison(projectionInputs), [projectionInputs]);

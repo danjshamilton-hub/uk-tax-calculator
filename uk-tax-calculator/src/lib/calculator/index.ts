@@ -8,7 +8,8 @@ import { calculateIncomeTax } from './incomeTax';
 export { getTaxBreakdown } from './incomeTax';
 export type { TaxBracketBreakdown } from './incomeTax';
 import { calculateNationalInsurance } from './nationalInsurance';
-import { calculateAdjustedNetIncome, calculateTotalBenefitsImpact } from './benefits';
+import { calculateStudentLoanRepayment, calculatePostgradLoanRepayment, getMarginalStudentLoanRate } from './studentLoan';
+import { calculateAdjustedNetIncome, calculateTotalBenefitsImpact, calculateAnnualChildBenefit } from './benefits';
 import { calculateMaxMortgage } from './mortgageRepayment';
 import { analyzeHousePurchase } from './housePurchase';
 import { getTaxConfig } from '../../data/taxRates2025';
@@ -211,19 +212,22 @@ function generateCliffEdgeWarnings(inputs: ScenarioInputs, results: CalculationR
  * Main calculation function following the precise order from the plan
  */
 export function calculateAllResults(inputs: ScenarioInputs): CalculationResults {
-  // 1. Start with original gross salary and bonus
+  // 1. Start with original gross salary, bonus, and cash car allowance
   const grossSalary = inputs.grossSalary;
   const bonusAmount = inputs.bonusAmount || 0;
   const bonusSacrificePercentage = inputs.bonusSacrificePercentage || 0;
+  // Car allowance is paid as cash: subject to income tax and NI like salary,
+  // counts towards ANI, but is NOT pensionable and NOT salary-sacrificed
+  const carAllowance = inputs.carAllowance || 0;
 
   // Calculate bonus sacrifice amount based on percentage
   const bonusSacrificedToPension = bonusAmount * (bonusSacrificePercentage / 100);
 
   // Total gross before any deductions
-  const totalGrossIncome = grossSalary + bonusAmount;
+  const totalGrossIncome = grossSalary + bonusAmount + carAllowance;
 
   // Effective gross for calculations (after bonus sacrifice)
-  const effectiveGross = grossSalary + bonusAmount - bonusSacrificedToPension;
+  const effectiveGross = grossSalary + bonusAmount + carAllowance - bonusSacrificedToPension;
 
   // 2-3. Employee and employer pension (on salary only, not bonus - unless sacrificed)
   const employeePension = calculateEmployeePension(grossSalary, inputs.employeePensionPercentage);
@@ -254,6 +258,12 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
   // 9. National Insurance (on gross after deductions, NOT including BIK)
   const nationalInsurance = calculateNationalInsurance(grossAfterDeductions);
 
+  // 9b. Student loan repayments (same pay basis as NI: post-sacrifice pay, excluding BIK)
+  const studentLoanPlan = inputs.studentLoanPlan ?? 'none';
+  const hasPostgradLoan = inputs.hasPostgradLoan ?? false;
+  const studentLoanRepayment = calculateStudentLoanRepayment(grossAfterDeductions, studentLoanPlan);
+  const postgradLoanRepayment = calculatePostgradLoanRepayment(grossAfterDeductions, hasPostgradLoan);
+
   // 10. BIK tax (approximate using marginal rate)
   const currentMarginalTaxRate = getMarginalTaxRate(taxableIncome, inputs.taxRegion);
   const bikTax = bikTaxableAmount * (currentMarginalTaxRate / 100);
@@ -275,31 +285,53 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
     inputs.taxRegion
   );
 
+  // Child Benefit: only received (and only charged) if the family claims it.
+  // The HICBC can never exceed the benefit, so claiming is never worse than not claiming.
+  const claimsChildBenefit = inputs.hasChildren && (inputs.claimsChildBenefit ?? true);
+  const childBenefitReceived = claimsChildBenefit
+    ? calculateAnnualChildBenefit(inputs.numberOfChildren)
+    : 0;
+  const childBenefitCharge = claimsChildBenefit ? benefitsImpact.childBenefitCharge : 0;
+  const netChildBenefit = childBenefitReceived - childBenefitCharge;
+
   // 13. Take-home
   // Note: incomeTax is calculated on taxableIncome which includes bikTaxableAmount,
-  // so we do NOT subtract bikTax separately - it's already included in incomeTax
+  // so we do NOT subtract bikTax separately - it's already included in incomeTax.
+  // Child benefit is added as cash received, net of the high income charge.
   const annualTakeHome =
     grossAfterDeductions -
     incomeTax -
     nationalInsurance -
-    benefitsImpact.childBenefitCharge;
+    studentLoanRepayment -
+    postgradLoanRepayment +
+    netChildBenefit;
   const monthlyTakeHome = annualTakeHome / 12;
 
-  // 14. Calculate effective tax rate (taxes paid as % of total gross)
-  const taxesPaid = incomeTax + nationalInsurance + bikTax + benefitsImpact.childBenefitCharge;
+  // 14. Calculate effective tax rate (payroll deductions as % of total gross)
+  // bikTax is already included in incomeTax, so it is not added again here
+  const taxesPaid =
+    incomeTax + nationalInsurance + studentLoanRepayment + postgradLoanRepayment + childBenefitCharge;
   const effectiveTaxRate = totalGrossIncome > 0 ? (taxesPaid / totalGrossIncome) * 100 : 0;
 
   // 15. Calculate marginal rates
   const marginalTaxRate = getMarginalTaxRate(taxableIncome, inputs.taxRegion);
   const marginalNIRate = getMarginalNIRate(grossAfterDeductions);
 
-  // Calculate Child Benefit taper impact if applicable
-  const childBenefitMarginalImpact = inputs.hasChildren
+  // Calculate Child Benefit taper impact if applicable (only bites if claiming)
+  const childBenefitMarginalImpact = claimsChildBenefit
     ? getChildBenefitMarginalImpact(adjustedNetIncome, inputs.numberOfChildren)
     : 0;
 
-  // Combined rate includes income tax, NI, and child benefit taper effect
-  const combinedMarginalRate = marginalTaxRate + marginalNIRate + childBenefitMarginalImpact;
+  // Marginal student loan rate on the next £1 of pay
+  const marginalStudentLoanRate = getMarginalStudentLoanRate(
+    grossAfterDeductions,
+    studentLoanPlan,
+    hasPostgradLoan
+  );
+
+  // Combined rate includes income tax, NI, student loan, and child benefit taper effect
+  const combinedMarginalRate =
+    marginalTaxRate + marginalNIRate + marginalStudentLoanRate + childBenefitMarginalImpact;
 
   // 16. Calculate headroom to thresholds
   const headroom = calculateHeadroom(adjustedNetIncome, taxableIncome, inputs.hasChildren, inputs.taxRegion);
@@ -327,6 +359,7 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
     grossSalary,
     bonusAmount,
     bonusSacrificedToPension,
+    carAllowance,
     totalGrossIncome,
     employeePension: totalEmployeePensionContribution,
     employerPension,
@@ -337,13 +370,18 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
     incomeTax,
     nationalInsurance,
     bikTax,
+    studentLoanRepayment,
+    postgradLoanRepayment,
     adjustedNetIncome,
     effectiveTaxRate: Math.round(effectiveTaxRate * 10) / 10,
     marginalTaxRate,
     marginalNIRate,
+    marginalStudentLoanRate,
     combinedMarginalRate,
     headroom,
-    childBenefitCharge: benefitsImpact.childBenefitCharge,
+    childBenefitReceived,
+    childBenefitCharge,
+    netChildBenefit,
     taxFreeChildcareBenefit: benefitsImpact.taxFreeChildcareBenefit,
     freeChildcareLoss: benefitsImpact.freeChildcareLoss,
     annualTakeHome,

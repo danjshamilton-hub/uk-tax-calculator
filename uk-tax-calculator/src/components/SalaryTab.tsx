@@ -9,6 +9,8 @@ import type {
   ScenarioBState,
 } from '../types/appState';
 import { getTaxBreakdown } from '../lib/calculator';
+import { studentLoanPlans, postgradLoanConfig } from '../data/studentLoanRates2025';
+import type { StudentLoanPlan } from '../data/studentLoanRates2025';
 import { formatCurrency, safeNumber } from '../lib/utils/formatters';
 import { CompareRow } from './CompareRow';
 
@@ -93,6 +95,10 @@ export function SalaryTab({
                   <label className={labelCls}>Your Pension %</label>
                   <input type="number" value={salary.employeePensionPercentage} onChange={e => updateSalary({ employeePensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
                 </div>
+                <div className={fieldCls}>
+                  <label className={labelCls}>Employer Pension %</label>
+                  <input type="number" value={salary.employerPensionPercentage} onChange={e => updateSalary({ employerPensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
+                </div>
               </div>
               <div>
                 <div className="text-xs text-blue-600 mb-1">Scenario B</div>
@@ -103,6 +109,17 @@ export function SalaryTab({
                 <div className={fieldCls}>
                   <label className={labelCls}>Your Pension %</label>
                   <input type="number" value={scenarioB.employeePensionPercentage} onChange={e => updateB({ employeePensionPercentage: safeNumber(e.target.value) })} className={inputClsB} min="0" max="100" />
+                </div>
+                <div className={fieldCls}>
+                  <label className={labelCls}>Employer Pension %</label>
+                  <input
+                    type="number"
+                    value={scenarioB.employerPensionPercentage ?? salary.employerPensionPercentage}
+                    onChange={e => updateB({ employerPensionPercentage: safeNumber(e.target.value) })}
+                    className={inputClsB}
+                    min="0"
+                    max="100"
+                  />
                 </div>
               </div>
             </div>
@@ -134,13 +151,6 @@ export function SalaryTab({
             </div>
           )}
 
-          {compareMode && (
-            <div className={fieldCls}>
-              <label className={labelCls}>Employer Pension % (both)</label>
-              <input type="number" value={salary.employerPensionPercentage} onChange={e => updateSalary({ employerPensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3">
             <div className={fieldCls}>
               <label className={labelCls}>Current Age</label>
@@ -151,16 +161,62 @@ export function SalaryTab({
               <input type="number" value={salary.retirementAge} onChange={e => updateSalary({ retirementAge: safeNumber(e.target.value, 65) })} className={inputCls} min="50" max="100" />
             </div>
           </div>
+
+          {/* Student Loan (shared between scenarios) */}
+          <label className="flex items-center gap-2 mb-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={(salary.studentLoanPlan ?? 'none') !== 'none'}
+              onChange={e => updateSalary({
+                studentLoanPlan: e.target.checked ? 'plan2' : 'none',
+                hasPostgradLoan: e.target.checked ? salary.hasPostgradLoan : false,
+              })}
+              className="w-[18px] h-[18px]"
+            />
+            <span>Student Loan</span>
+          </label>
+          {(salary.studentLoanPlan ?? 'none') !== 'none' && (
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div className={fieldCls}>
+                <label className={labelCls}>Plan</label>
+                <select
+                  value={salary.studentLoanPlan}
+                  onChange={e => updateSalary({ studentLoanPlan: e.target.value as StudentLoanPlan })}
+                  className={inputCls}
+                >
+                  {Object.entries(studentLoanPlans).map(([id, cfg]) => (
+                    <option key={id} value={id}>
+                      {cfg.label} — {cfg.rate}% over £{cfg.threshold.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={fieldCls}>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={salary.hasPostgradLoan ?? false}
+                    onChange={e => updateSalary({ hasPostgradLoan: e.target.checked })}
+                  />
+                  + Postgraduate ({postgradLoanConfig.rate}%)
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Company Car */}
         <div className={sectionCls}>
-          <h2 className={sectionHeaderCls}>Company Car (Salary Sacrifice)</h2>
+          <h2 className={sectionHeaderCls}>Car (Sacrifice or Allowance)</h2>
 
           {compareMode ? (
             <div className="grid grid-cols-2 gap-3">
               {/* Scenario A */}
               <div>
+                <div className={fieldCls}>
+                  <label className={labelCls}>Monthly Car Allowance</label>
+                  <input type="number" value={companyCar.carAllowance ?? 0} onChange={e => updateCar({ carAllowance: safeNumber(e.target.value) })} className={inputCls} />
+                </div>
                 <label className="flex items-center gap-2 mb-2 cursor-pointer">
                   <input type="checkbox" checked={companyCar.hasCompanyCar} onChange={e => updateCar({ hasCompanyCar: e.target.checked })} className="w-4 h-4" />
                   <span className="text-xs text-gray-500">Scenario A</span>
@@ -184,6 +240,10 @@ export function SalaryTab({
               </div>
               {/* Scenario B */}
               <div>
+                <div className={fieldCls}>
+                  <label className={labelCls}>Monthly Car Allowance</label>
+                  <input type="number" value={scenarioB.companyCar.carAllowance ?? 0} onChange={e => updateBCar({ carAllowance: safeNumber(e.target.value) })} className={inputClsB} />
+                </div>
                 <label className="flex items-center gap-2 mb-2 cursor-pointer">
                   <input type="checkbox" checked={scenarioB.companyCar.hasCompanyCar} onChange={e => updateBCar({ hasCompanyCar: e.target.checked })} className="w-4 h-4" />
                   <span className="text-xs text-blue-600">Scenario B</span>
@@ -208,9 +268,14 @@ export function SalaryTab({
             </div>
           ) : (
             <>
+              <div className={fieldCls}>
+                <label className={labelCls}>Monthly Car Allowance (cash)</label>
+                <input type="number" value={companyCar.carAllowance ?? 0} onChange={e => updateCar({ carAllowance: safeNumber(e.target.value) })} className={inputCls} />
+                <span className="text-[11px] text-gray-500">Paid with salary — taxed & NI'd normally, counts towards ANI. Not pensionable.</span>
+              </div>
               <label className="flex items-center gap-2 mb-3 cursor-pointer">
                 <input type="checkbox" checked={companyCar.hasCompanyCar} onChange={e => updateCar({ hasCompanyCar: e.target.checked })} className="w-[18px] h-[18px]" />
-                <span>Enable Company Car</span>
+                <span>Enable Company Car (salary sacrifice)</span>
               </label>
               {companyCar.hasCompanyCar && (
                 <>
@@ -330,6 +395,9 @@ export function SalaryTab({
             </thead>
             <tbody>
               <CompareRow label="Gross Salary" valueA={resultA.grossSalary} valueB={resultB?.grossSalary ?? null} compareMode={compareMode} />
+              {(resultA.carAllowance > 0 || (resultB?.carAllowance ?? 0) > 0) && (
+                <CompareRow label="Car Allowance" valueA={resultA.carAllowance} valueB={resultB?.carAllowance ?? null} compareMode={compareMode} />
+              )}
               {resultA.bonusAmount > 0 && (
                 <CompareRow label={resultA.bonusSacrificedToPension > 0 ? 'Bonus (sacrificed)' : 'Bonus'} valueA={resultA.bonusAmount} valueB={resultB?.bonusAmount ?? null} compareMode={compareMode} />
               )}
@@ -384,11 +452,35 @@ export function SalaryTab({
               })()}
 
               <CompareRow label="National Insurance" valueA={resultA.nationalInsurance} valueB={resultB?.nationalInsurance ?? null} compareMode={compareMode} isDeduction />
+              {(resultA.studentLoanRepayment > 0 || (resultB?.studentLoanRepayment ?? 0) > 0) && (
+                <CompareRow
+                  label={`Student Loan (${(salary.studentLoanPlan && salary.studentLoanPlan !== 'none') ? studentLoanPlans[salary.studentLoanPlan].label : ''})`}
+                  valueA={resultA.studentLoanRepayment}
+                  valueB={resultB?.studentLoanRepayment ?? null}
+                  compareMode={compareMode}
+                  isDeduction
+                />
+              )}
+              {(resultA.postgradLoanRepayment > 0 || (resultB?.postgradLoanRepayment ?? 0) > 0) && (
+                <CompareRow label="Postgraduate Loan" valueA={resultA.postgradLoanRepayment} valueB={resultB?.postgradLoanRepayment ?? null} compareMode={compareMode} isDeduction />
+              )}
               {(resultA.bikTax > 0 || (resultB?.bikTax ?? 0) > 0) && (
-                <CompareRow label="BIK Tax" valueA={resultA.bikTax} valueB={resultB?.bikTax ?? null} compareMode={compareMode} isDeduction />
+                <CompareRow label="BIK Tax (included in Income Tax above)" valueA={resultA.bikTax} valueB={resultB?.bikTax ?? null} compareMode={compareMode} isDeduction />
+              )}
+              {(resultA.childBenefitReceived > 0 || (resultB?.childBenefitReceived ?? 0) > 0) && (
+                <tr>
+                  <td className="py-1.5 text-green-800">Child Benefit</td>
+                  <td className="text-right text-green-800">+{formatCurrency(resultA.childBenefitReceived)}</td>
+                  {compareMode && resultB && (
+                    <>
+                      <td className="text-right text-green-800">+{formatCurrency(resultB.childBenefitReceived)}</td>
+                      <td></td>
+                    </>
+                  )}
+                </tr>
               )}
               {(adjA.effectiveCharge > 0 || (adjB?.effectiveCharge ?? 0) > 0) && (
-                <CompareRow label="Child Benefit Charge" valueA={adjA.effectiveCharge} valueB={adjB?.effectiveCharge ?? null} compareMode={compareMode} isDeduction />
+                <CompareRow label="Child Benefit Charge (HICBC)" valueA={adjA.effectiveCharge} valueB={adjB?.effectiveCharge ?? null} compareMode={compareMode} isDeduction />
               )}
 
               {/* Annual & Monthly take-home */}
@@ -422,8 +514,17 @@ export function SalaryTab({
                 <td colSpan={compareMode ? 4 : 1} className="py-2 text-xs text-gray-500 font-semibold">Monthly Breakdown (for comparison)</td>
               </tr>
               <MonthlyRow label="Monthly Gross" valueA={resultA.grossSalary / 12} valueB={resultB ? resultB.grossSalary / 12 : null} compareMode={compareMode} />
+              <MonthlyRow label="Monthly Salary (after pension & sacrifice)" valueA={resultA.grossAfterDeductions / 12} valueB={resultB ? resultB.grossAfterDeductions / 12 : null} compareMode={compareMode} />
               <MonthlyRow label="Monthly Income Tax" valueA={resultA.incomeTax / 12} valueB={resultB ? resultB.incomeTax / 12 : null} compareMode={compareMode} />
               <MonthlyRow label="Monthly NI" valueA={resultA.nationalInsurance / 12} valueB={resultB ? resultB.nationalInsurance / 12 : null} compareMode={compareMode} />
+              {(resultA.studentLoanRepayment + resultA.postgradLoanRepayment > 0 || ((resultB?.studentLoanRepayment ?? 0) + (resultB?.postgradLoanRepayment ?? 0)) > 0) && (
+                <MonthlyRow
+                  label="Monthly Student Loan"
+                  valueA={(resultA.studentLoanRepayment + resultA.postgradLoanRepayment) / 12}
+                  valueB={resultB ? (resultB.studentLoanRepayment + resultB.postgradLoanRepayment) / 12 : null}
+                  compareMode={compareMode}
+                />
+              )}
 
               {/* Tax-Free Childcare benefit rows */}
               {(adjA.hasTaxFreeChildcareBenefit || adjB?.hasTaxFreeChildcareBenefit) && (
@@ -494,7 +595,7 @@ export function SalaryTab({
               <div>
                 <div className="text-xs text-gray-500 mb-1">Marginal Rate</div>
                 <div className="text-2xl font-bold text-red-600">{resultA.combinedMarginalRate}%</div>
-                <div className="text-[11px] text-gray-500">Tax {resultA.marginalTaxRate}% + NI {resultA.marginalNIRate}%</div>
+                <div className="text-[11px] text-gray-500">Tax {resultA.marginalTaxRate}% + NI {resultA.marginalNIRate}%{resultA.marginalStudentLoanRate > 0 ? ` + SL ${resultA.marginalStudentLoanRate}%` : ''}</div>
               </div>
             </div>
           )}
@@ -640,7 +741,7 @@ function TaxRateCard({ label, bgClass, labelColor, result }: {
           <div className="text-xl font-bold text-red-600">{result.combinedMarginalRate}%</div>
         </div>
       </div>
-      <div className="text-[10px] text-gray-500">Tax {result.marginalTaxRate}% + NI {result.marginalNIRate}%</div>
+      <div className="text-[10px] text-gray-500">Tax {result.marginalTaxRate}% + NI {result.marginalNIRate}%{result.marginalStudentLoanRate > 0 ? ` + SL ${result.marginalStudentLoanRate}%` : ''}</div>
     </div>
   );
 }

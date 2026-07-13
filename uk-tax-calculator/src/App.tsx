@@ -31,6 +31,8 @@ function App() {
     employerPensionPercentage: 3,
     currentAge: 35,
     retirementAge: 65,
+    studentLoanPlan: 'none',
+    hasPostgradLoan: false,
   });
 
   const [companyCar, setCompanyCar] = usePersistedState<CompanyCarState>('app:companyCar', {
@@ -117,10 +119,14 @@ function App() {
     carSalarySacrifice: companyCar.hasCompanyCar ? companyCar.carSalarySacrifice * 12 : 0,
     carP11DValue: companyCar.carP11DValue,
     carBIKPercentage: companyCar.carBIKPercentage,
+    carAllowance: (companyCar.carAllowance ?? 0) * 12,
     currentAge: salary.currentAge,
     retirementAge: salary.retirementAge,
+    studentLoanPlan: salary.studentLoanPlan ?? 'none',
+    hasPostgradLoan: salary.hasPostgradLoan ?? false,
     hasChildren: children.hasChildren,
     numberOfChildren: children.hasChildren ? children.numberOfChildren : 0,
+    claimsChildBenefit: children.claimsChildBenefitA,
     housePurchase: housePurchaseInputs,
   }), [salary, bonus, companyCar, children, housePurchaseInputs]);
 
@@ -129,24 +135,27 @@ function App() {
     name: 'Scenario B',
     grossSalary: scenarioB.grossSalary,
     employeePensionPercentage: scenarioB.employeePensionPercentage,
+    employerPensionPercentage: scenarioB.employerPensionPercentage ?? salary.employerPensionPercentage,
     bonusAmount: scenarioB.bonus.bonusAmount,
     bonusSacrificePercentage: scenarioB.bonus.bonusSacrificePercentage,
     hasCompanyCar: scenarioB.companyCar.hasCompanyCar,
     carSalarySacrifice: scenarioB.companyCar.hasCompanyCar ? scenarioB.companyCar.carSalarySacrifice * 12 : 0,
     carP11DValue: scenarioB.companyCar.carP11DValue,
     carBIKPercentage: scenarioB.companyCar.carBIKPercentage,
-  }), [inputsA, scenarioB]);
+    carAllowance: (scenarioB.companyCar.carAllowance ?? 0) * 12,
+    claimsChildBenefit: children.claimsChildBenefitB,
+  }), [inputsA, scenarioB, children.claimsChildBenefitB, salary.employerPensionPercentage]);
 
   const resultA = useMemo(() => calculateAllResults(inputsA), [inputsA]);
   const resultB = useMemo(() => compareMode ? calculateAllResults(inputsB) : null, [compareMode, inputsB]);
 
   // ─── Adjusted take-home values ───
 
-  const getAdjustedValues = (result: CalculationResults, claimsChildBenefit: boolean, usesTaxFreeChildcare: boolean) => {
-    const effectiveCharge = claimsChildBenefit ? result.childBenefitCharge : 0;
-    const adjustedAnnual = claimsChildBenefit
-      ? result.annualTakeHome
-      : result.annualTakeHome + result.childBenefitCharge;
+  // Child benefit claiming is now handled inside the calculator (via claimsChildBenefit input),
+  // so annualTakeHome already includes child benefit received net of the high income charge.
+  const getAdjustedValues = (result: CalculationResults, usesTaxFreeChildcare: boolean) => {
+    const effectiveCharge = result.childBenefitCharge;
+    const adjustedAnnual = result.annualTakeHome;
     const adjustedMonthly = adjustedAnnual / 12;
     const taxFreeChildcareBenefitAmount = usesTaxFreeChildcare ? result.taxFreeChildcareBenefit : 0;
     const effectiveMonthly = adjustedMonthly + (taxFreeChildcareBenefitAmount / 12);
@@ -155,12 +164,12 @@ function App() {
   };
 
   const adjA = useMemo(
-    () => getAdjustedValues(resultA, children.claimsChildBenefitA, children.usesTaxFreeChildcareA),
-    [resultA, children.claimsChildBenefitA, children.usesTaxFreeChildcareA]
+    () => getAdjustedValues(resultA, children.usesTaxFreeChildcareA),
+    [resultA, children.usesTaxFreeChildcareA]
   );
   const adjB = useMemo(
-    () => resultB ? getAdjustedValues(resultB, children.claimsChildBenefitB, children.usesTaxFreeChildcareB) : null,
-    [resultB, children.claimsChildBenefitB, children.usesTaxFreeChildcareB]
+    () => resultB ? getAdjustedValues(resultB, children.usesTaxFreeChildcareB) : null,
+    [resultB, children.usesTaxFreeChildcareB]
   );
 
   // ─── Tab style helper ───
@@ -264,6 +273,8 @@ function App() {
           carSalarySacrifice={companyCar.carSalarySacrifice}
           carP11DValue={companyCar.carP11DValue}
           carBIKPercentage={companyCar.carBIKPercentage}
+          studentLoanPlan={salary.studentLoanPlan ?? 'none'}
+          hasPostgradLoan={salary.hasPostgradLoan ?? false}
         />
       )}
 

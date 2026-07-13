@@ -1,4 +1,5 @@
 import type { TaxRegion } from '../data/taxRates2025';
+import type { StudentLoanPlan } from '../data/studentLoanRates2025';
 import type { BudgetExpense } from './budget';
 
 /** Salary & personal details (shared between scenarios) */
@@ -9,6 +10,8 @@ export interface SalaryState {
   employerPensionPercentage: number;
   currentAge: number;
   retirementAge: number;
+  studentLoanPlan?: StudentLoanPlan; // shared between scenarios, defaults to 'none'
+  hasPostgradLoan?: boolean;
 }
 
 /** Company car inputs for a single scenario */
@@ -17,6 +20,7 @@ export interface CompanyCarState {
   carSalarySacrifice: number;
   carP11DValue: number;
   carBIKPercentage: number;
+  carAllowance?: number; // monthly cash allowance, taxed as normal salary (independent of company car)
 }
 
 /** Bonus inputs for a single scenario */
@@ -39,6 +43,7 @@ export interface ChildrenState {
 export interface ScenarioBState {
   grossSalary: number;
   employeePensionPercentage: number;
+  employerPensionPercentage?: number; // defaults to Scenario A's value if unset
   companyCar: CompanyCarState;
   bonus: BonusState;
 }
@@ -79,6 +84,8 @@ export const DEFAULT_SALARY: SalaryState = {
   employerPensionPercentage: 3,
   currentAge: 35,
   retirementAge: 65,
+  studentLoanPlan: 'none',
+  hasPostgradLoan: false,
 };
 
 export const DEFAULT_COMPANY_CAR: CompanyCarState = {
@@ -86,6 +93,7 @@ export const DEFAULT_COMPANY_CAR: CompanyCarState = {
   carSalarySacrifice: 500,
   carP11DValue: 35000,
   carBIKPercentage: 2,
+  carAllowance: 0,
 };
 
 export const DEFAULT_BONUS: BonusState = {
@@ -105,6 +113,7 @@ export const DEFAULT_CHILDREN: ChildrenState = {
 export const DEFAULT_SCENARIO_B: ScenarioBState = {
   grossSalary: 50000,
   employeePensionPercentage: 10,
+  employerPensionPercentage: undefined,
   companyCar: { ...DEFAULT_COMPANY_CAR },
   bonus: { ...DEFAULT_BONUS },
 };

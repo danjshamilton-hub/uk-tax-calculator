@@ -17,8 +17,18 @@ export function calculateAdjustedNetIncome(
 }
 
 /**
+ * Total annual Child Benefit for a family (higher rate for eldest, lower for others)
+ */
+export function calculateAnnualChildBenefit(numberOfChildren: number): number {
+  if (numberOfChildren <= 0) return 0;
+  const { annualBenefitFirstChild, annualBenefitAdditionalChild } = benefitsThresholds.childBenefit;
+  return annualBenefitFirstChild + (numberOfChildren - 1) * annualBenefitAdditionalChild;
+}
+
+/**
  * Calculate High Income Child Benefit Charge
- * Tapers from £60k to £80k (1% per £200 over £60k)
+ * Tapers from £60k to £80k: 1% of the benefit per full £200 of ANI over £60k
+ * (HMRC rounds the percentage down to a whole number)
  */
 export function calculateChildBenefitCharge(
   adjustedNetIncome: number,
@@ -27,22 +37,19 @@ export function calculateChildBenefitCharge(
 ): number {
   if (!hasChildren || numberOfChildren === 0) return 0;
 
-  const { taperStart, taperEnd, annualBenefitFirstChild, annualBenefitAdditionalChild } =
-    benefitsThresholds.childBenefit;
+  const { taperStart, taperEnd } = benefitsThresholds.childBenefit;
 
   if (adjustedNetIncome <= taperStart) return 0;
 
-  // Calculate annual child benefit
-  const totalChildBenefit =
-    annualBenefitFirstChild + (numberOfChildren - 1) * annualBenefitAdditionalChild;
+  const totalChildBenefit = calculateAnnualChildBenefit(numberOfChildren);
 
   if (adjustedNetIncome >= taperEnd) {
     return totalChildBenefit; // 100% charge
   }
 
-  // Taper: 1% per £200 over £60k
+  // Taper: 1% per full £200 over £60k
   const excessIncome = adjustedNetIncome - taperStart;
-  const chargePercentage = (excessIncome / 200) * 1;
+  const chargePercentage = Math.floor(excessIncome / 200);
   const charge = totalChildBenefit * (chargePercentage / 100);
 
   return Math.round(charge * 100) / 100;

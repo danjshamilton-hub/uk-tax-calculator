@@ -11,8 +11,10 @@ interface CompareRowProps {
 
 export function CompareRow({ label, valueA, valueB, compareMode, isDeduction = false, isBold = false }: CompareRowProps) {
   const diff = valueB !== null ? valueB - valueA : null;
+  // For deductions, a bigger number is worse (less take-home), so the good/bad color is inverted
+  const diffIsGood = diff !== null && diff !== 0 ? (isDeduction ? diff < 0 : diff > 0) : null;
   const diffColor = diff !== null
-    ? (diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-600' : 'text-gray-500')
+    ? (diff === 0 ? 'text-gray-500' : diffIsGood ? 'text-emerald-600' : 'text-red-600')
     : '';
 
   return (

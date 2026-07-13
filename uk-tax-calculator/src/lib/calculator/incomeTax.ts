@@ -55,7 +55,8 @@ export function calculateIncomeTax(taxableIncome: number, region: TaxRegion): nu
     if (band.rate === 0) continue; // Skip 0% bands (PA already applied)
     if (remainingIncome <= 0) break;
 
-    const bandStart = Math.max(0, band.min - personalAllowance);
+    // Bands are inclusive [min, max], so the band actually spans (min - 1, max]
+    const bandStart = Math.max(0, band.min - 1 - personalAllowance);
     const bandEnd = band.max === null ? Infinity : band.max - personalAllowance;
     const bandWidth = bandEnd - bandStart;
 
@@ -130,7 +131,7 @@ export function getTaxBreakdown(taxableIncome: number, region: TaxRegion): TaxBr
       continue;
     }
 
-    const adjustedBandStart = Math.max(0, band.min - personalAllowance);
+    const adjustedBandStart = Math.max(0, band.min - 1 - personalAllowance);
     const adjustedBandEnd = band.max === null ? Infinity : band.max - personalAllowance;
     const bandWidth = adjustedBandEnd - adjustedBandStart;
 
