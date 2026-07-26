@@ -23,7 +23,7 @@ export const constants = {
   minProjectionYears: 1,
   maxProjectionYears: 10,
   defaultSalaryIncrease: 3.0, // annual percentage
-  defaultStartingTaxYear: 2025,
+  defaultStartingTaxYear: 2026,
 
   // Budget
   defaultBudgetProjectionYears: 3,

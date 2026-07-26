@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CalculationResults } from '../types/scenario';
-import type { TaxRegion } from '../data/taxRates2025';
+import type { TaxRegion } from '../data/taxYears';
 import type {
   SalaryState,
   CompanyCarState,
@@ -9,8 +9,8 @@ import type {
   ScenarioBState,
 } from '../types/appState';
 import { getTaxBreakdown } from '../lib/calculator';
-import { studentLoanPlans, postgradLoanConfig } from '../data/studentLoanRates2025';
-import type { StudentLoanPlan } from '../data/studentLoanRates2025';
+import { getStudentLoanPlans, getPostgradLoanConfig, DEFAULT_TAX_YEAR } from '../data/taxYears';
+import type { StudentLoanPlan } from '../data/taxYears';
 import { formatCurrency, safeNumber } from '../lib/utils/formatters';
 import { CompareRow } from './CompareRow';
 
@@ -184,7 +184,7 @@ export function SalaryTab({
                   onChange={e => updateSalary({ studentLoanPlan: e.target.value as StudentLoanPlan })}
                   className={inputCls}
                 >
-                  {Object.entries(studentLoanPlans).map(([id, cfg]) => (
+                  {Object.entries(getStudentLoanPlans(DEFAULT_TAX_YEAR)).map(([id, cfg]) => (
                     <option key={id} value={id}>
                       {cfg.label} — {cfg.rate}% over £{cfg.threshold.toLocaleString()}
                     </option>
@@ -198,7 +198,7 @@ export function SalaryTab({
                     checked={salary.hasPostgradLoan ?? false}
                     onChange={e => updateSalary({ hasPostgradLoan: e.target.checked })}
                   />
-                  + Postgraduate ({postgradLoanConfig.rate}%)
+                  + Postgraduate ({getPostgradLoanConfig(DEFAULT_TAX_YEAR).rate}%)
                 </label>
               </div>
             </div>
@@ -454,7 +454,7 @@ export function SalaryTab({
               <CompareRow label="National Insurance" valueA={resultA.nationalInsurance} valueB={resultB?.nationalInsurance ?? null} compareMode={compareMode} isDeduction />
               {(resultA.studentLoanRepayment > 0 || (resultB?.studentLoanRepayment ?? 0) > 0) && (
                 <CompareRow
-                  label={`Student Loan (${(salary.studentLoanPlan && salary.studentLoanPlan !== 'none') ? studentLoanPlans[salary.studentLoanPlan].label : ''})`}
+                  label={`Student Loan (${(salary.studentLoanPlan && salary.studentLoanPlan !== 'none') ? getStudentLoanPlans(DEFAULT_TAX_YEAR)[salary.studentLoanPlan].label : ''})`}
                   valueA={resultA.studentLoanRepayment}
                   valueB={resultB?.studentLoanRepayment ?? null}
                   compareMode={compareMode}

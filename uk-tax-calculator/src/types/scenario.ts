@@ -1,12 +1,14 @@
 // Core type definitions for tax calculator scenarios
 
-import type { TaxRegion } from '../data/taxRates2025';
-import type { StudentLoanPlan } from '../data/studentLoanRates2025';
+import type { TaxRegion } from '../data/taxYears';
+import type { StudentLoanPlan } from '../data/taxYears';
 
 export interface ScenarioInputs {
   // Basic Info
   name: string;
   taxRegion: TaxRegion;
+  /** Tax year to calculate in (2026 = 2026/27). Defaults to DEFAULT_TAX_YEAR. */
+  taxYear?: number;
 
   // Salary & Benefits
   grossSalary: number;
@@ -42,6 +44,15 @@ export interface ScenarioInputs {
 
   // House Purchase (optional)
   housePurchase?: HousePurchaseInputs;
+
+  // Per-pay-period deduction overrides.
+  // NI and student loan are assessed per pay period rather than cumulatively, so
+  // callers modelling uneven pay across a year (parental leave) compute these
+  // month by month and supply the totals here instead of letting the annual
+  // basis understate them.
+  nationalInsuranceOverride?: number;
+  studentLoanOverride?: number;
+  postgradLoanOverride?: number;
 }
 
 export interface HousePurchaseInputs {

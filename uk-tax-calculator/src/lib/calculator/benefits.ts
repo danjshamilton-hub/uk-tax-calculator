@@ -1,7 +1,7 @@
 // Benefits Calculator (Child Benefit, Tax-Free Childcare, 30 Hours Free Childcare)
 
-import { benefitsThresholds } from '../../data/benefitsThresholds2025';
-import type { TaxRegion } from '../../data/taxRates2025';
+import { getBenefitsThresholds, DEFAULT_TAX_YEAR } from '../../data/taxYears';
+import type { TaxRegion } from '../../data/taxYears';
 
 /**
  * Calculate Adjusted Net Income (ANI) for benefits means-testing
@@ -19,9 +19,13 @@ export function calculateAdjustedNetIncome(
 /**
  * Total annual Child Benefit for a family (higher rate for eldest, lower for others)
  */
-export function calculateAnnualChildBenefit(numberOfChildren: number): number {
+export function calculateAnnualChildBenefit(
+  numberOfChildren: number,
+  taxYear: number = DEFAULT_TAX_YEAR
+): number {
   if (numberOfChildren <= 0) return 0;
-  const { annualBenefitFirstChild, annualBenefitAdditionalChild } = benefitsThresholds.childBenefit;
+  const { annualBenefitFirstChild, annualBenefitAdditionalChild } =
+    getBenefitsThresholds(taxYear).childBenefit;
   return annualBenefitFirstChild + (numberOfChildren - 1) * annualBenefitAdditionalChild;
 }
 
@@ -33,15 +37,16 @@ export function calculateAnnualChildBenefit(numberOfChildren: number): number {
 export function calculateChildBenefitCharge(
   adjustedNetIncome: number,
   hasChildren: boolean,
-  numberOfChildren: number
+  numberOfChildren: number,
+  taxYear: number = DEFAULT_TAX_YEAR
 ): number {
   if (!hasChildren || numberOfChildren === 0) return 0;
 
-  const { taperStart, taperEnd } = benefitsThresholds.childBenefit;
+  const { taperStart, taperEnd } = getBenefitsThresholds(taxYear).childBenefit;
 
   if (adjustedNetIncome <= taperStart) return 0;
 
-  const totalChildBenefit = calculateAnnualChildBenefit(numberOfChildren);
+  const totalChildBenefit = calculateAnnualChildBenefit(numberOfChildren, taxYear);
 
   if (adjustedNetIncome >= taperEnd) {
     return totalChildBenefit; // 100% charge
@@ -62,11 +67,13 @@ export function calculateChildBenefitCharge(
 export function calculateTaxFreeChildcareBenefit(
   adjustedNetIncome: number,
   hasChildren: boolean,
-  numberOfChildren: number
+  numberOfChildren: number,
+  taxYear: number = DEFAULT_TAX_YEAR
 ): number {
   if (!hasChildren || numberOfChildren === 0) return 0;
 
-  const { threshold, governmentContributionPerChild } = benefitsThresholds.taxFreeChildcare;
+  const { threshold, governmentContributionPerChild } =
+    getBenefitsThresholds(taxYear).taxFreeChildcare;
 
   // Eligible for benefit if ANI is at or below threshold
   if (adjustedNetIncome <= threshold) {
@@ -84,12 +91,13 @@ export function calculate30HoursFreeChildcareLoss(
   adjustedNetIncome: number,
   hasChildren: boolean,
   numberOfChildren: number,
-  region: TaxRegion
+  region: TaxRegion,
+  taxYear: number = DEFAULT_TAX_YEAR
 ): number {
   if (!hasChildren || numberOfChildren === 0) return 0;
   if (region !== 'england') return 0; // England only
 
-  const { threshold } = benefitsThresholds.freeChildcare30Hours;
+  const { threshold } = getBenefitsThresholds(taxYear).freeChildcare30Hours;
 
   // This is a qualitative loss - hard to quantify exact value
   // For now, return 0 but flag in warnings
@@ -108,7 +116,8 @@ export function calculateTotalBenefitsImpact(
   adjustedNetIncome: number,
   hasChildren: boolean,
   numberOfChildren: number,
-  region: TaxRegion
+  region: TaxRegion,
+  taxYear: number = DEFAULT_TAX_YEAR
 ): {
   childBenefitCharge: number;
   taxFreeChildcareBenefit: number;
@@ -118,18 +127,21 @@ export function calculateTotalBenefitsImpact(
   const childBenefitCharge = calculateChildBenefitCharge(
     adjustedNetIncome,
     hasChildren,
-    numberOfChildren
+    numberOfChildren,
+    taxYear
   );
   const taxFreeChildcareBenefit = calculateTaxFreeChildcareBenefit(
     adjustedNetIncome,
     hasChildren,
-    numberOfChildren
+    numberOfChildren,
+    taxYear
   );
   const freeChildcareLoss = calculate30HoursFreeChildcareLoss(
     adjustedNetIncome,
     hasChildren,
     numberOfChildren,
-    region
+    region,
+    taxYear
   );
 
   return {

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { calculateAllResults } from './lib/calculator';
 import type { ScenarioInputs, HousePurchaseInputs, CalculationResults } from './types/scenario';
-import type { TaxRegion } from './data/taxRates2025';
+import { DEFAULT_TAX_YEAR, formatTaxYear } from './data/taxYears';
+import type { TaxRegion } from './data/taxYears';
 import type {
   SalaryState,
   CompanyCarState,
@@ -189,7 +190,7 @@ function App() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <div>
           <h1 className="mb-1 text-2xl font-bold">UK Tax Calculator</h1>
-          <p className="text-gray-500 text-sm">2025/26 Tax Year</p>
+          <p className="text-gray-500 text-sm">{formatTaxYear(DEFAULT_TAX_YEAR)} Tax Year</p>
         </div>
         {activeTab === 'salary' && (
           <label className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg cursor-pointer">

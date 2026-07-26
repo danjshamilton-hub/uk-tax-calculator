@@ -1,7 +1,7 @@
 // Income Tax Calculator with Personal Allowance Taper
 
-import { getTaxConfig } from '../../data/taxRates2025';
-import type { TaxRegion } from '../../data/taxRates2025';
+import { getTaxConfig, DEFAULT_TAX_YEAR } from '../../data/taxYears';
+import type { TaxRegion } from '../../data/taxYears';
 
 export interface TaxBracketBreakdown {
   bandName: string;
@@ -17,8 +17,11 @@ export interface TaxBracketBreakdown {
  * PA reduces by £1 for every £2 earned over £100,000
  * Fully tapered out at £125,140
  */
-export function calculatePersonalAllowance(income: number): number {
-  const config = getTaxConfig('england'); // PA is same for both regions
+export function calculatePersonalAllowance(
+  income: number,
+  taxYear: number = DEFAULT_TAX_YEAR
+): number {
+  const config = getTaxConfig('england', taxYear); // PA is same for both regions
   const { personalAllowance, personalAllowanceTaperStart, personalAllowanceTaperEnd } = config;
 
   if (income <= personalAllowanceTaperStart) {
@@ -40,9 +43,13 @@ export function calculatePersonalAllowance(income: number): number {
 /**
  * Calculate income tax for a given taxable income and region
  */
-export function calculateIncomeTax(taxableIncome: number, region: TaxRegion): number {
-  const config = getTaxConfig(region);
-  const personalAllowance = calculatePersonalAllowance(taxableIncome);
+export function calculateIncomeTax(
+  taxableIncome: number,
+  region: TaxRegion,
+  taxYear: number = DEFAULT_TAX_YEAR
+): number {
+  const config = getTaxConfig(region, taxYear);
+  const personalAllowance = calculatePersonalAllowance(taxableIncome, taxYear);
 
   // Income subject to tax (after personal allowance)
   const taxableAfterPA = Math.max(0, taxableIncome - personalAllowance);
@@ -76,9 +83,13 @@ export function calculateIncomeTax(taxableIncome: number, region: TaxRegion): nu
 /**
  * Get tax breakdown by bracket for display purposes
  */
-export function getTaxBreakdown(taxableIncome: number, region: TaxRegion): TaxBracketBreakdown[] {
-  const config = getTaxConfig(region);
-  const personalAllowance = calculatePersonalAllowance(taxableIncome);
+export function getTaxBreakdown(
+  taxableIncome: number,
+  region: TaxRegion,
+  taxYear: number = DEFAULT_TAX_YEAR
+): TaxBracketBreakdown[] {
+  const config = getTaxConfig(region, taxYear);
+  const personalAllowance = calculatePersonalAllowance(taxableIncome, taxYear);
   const taxableAfterPA = Math.max(0, taxableIncome - personalAllowance);
 
   const breakdown: TaxBracketBreakdown[] = [];

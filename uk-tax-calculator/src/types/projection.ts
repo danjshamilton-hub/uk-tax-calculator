@@ -1,7 +1,7 @@
 // Multi-year projection type definitions
 
-import type { TaxRegion } from '../data/taxRates2025';
-import type { StudentLoanPlan } from '../data/studentLoanRates2025';
+import type { TaxRegion } from '../data/taxYears';
+import type { StudentLoanPlan } from '../data/taxYears';
 
 // ============================================
 // INPUT TYPES

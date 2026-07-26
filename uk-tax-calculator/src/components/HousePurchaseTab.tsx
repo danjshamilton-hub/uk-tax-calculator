@@ -1,5 +1,5 @@
 import type { CalculationResults } from '../types/scenario';
-import type { TaxRegion } from '../data/taxRates2025';
+import type { TaxRegion } from '../data/taxYears';
 import type { HouseState } from '../types/appState';
 import { formatCurrency, safeNumber } from '../lib/utils/formatters';
 import { constants } from '../data/constants';

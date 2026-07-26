@@ -12,16 +12,18 @@ import { calculateStudentLoanRepayment, calculatePostgradLoanRepayment, getMargi
 import { calculateAdjustedNetIncome, calculateTotalBenefitsImpact, calculateAnnualChildBenefit } from './benefits';
 import { calculateMaxMortgage } from './mortgageRepayment';
 import { analyzeHousePurchase } from './housePurchase';
-import { getTaxConfig } from '../../data/taxRates2025';
-import { benefitsThresholds } from '../../data/benefitsThresholds2025';
-import { nationalInsuranceBands } from '../../data/niRates2025';
-import type { TaxRegion } from '../../data/taxRates2025';
+import { getTaxConfig, getBenefitsThresholds, getNIBands, DEFAULT_TAX_YEAR } from '../../data/taxYears';
+import type { TaxRegion } from '../../data/taxYears';
 
 /**
  * Calculate marginal income tax rate for a given taxable income
  */
-function getMarginalTaxRate(taxableIncome: number, region: TaxRegion): number {
-  const config = getTaxConfig(region);
+function getMarginalTaxRate(
+  taxableIncome: number,
+  region: TaxRegion,
+  taxYear: number = DEFAULT_TAX_YEAR
+): number {
+  const config = getTaxConfig(region, taxYear);
   const { personalAllowanceTaperStart, personalAllowanceTaperEnd } = config;
 
   // In PA taper zone, effective marginal rate is higher
@@ -40,8 +42,8 @@ function getMarginalTaxRate(taxableIncome: number, region: TaxRegion): number {
 /**
  * Calculate marginal NI rate for a given gross income
  */
-function getMarginalNIRate(grossIncome: number): number {
-  const band = nationalInsuranceBands.find(b => grossIncome >= b.min && (b.max === null || grossIncome <= b.max));
+function getMarginalNIRate(grossIncome: number, taxYear: number = DEFAULT_TAX_YEAR): number {
+  const band = getNIBands(taxYear).find(b => grossIncome >= b.min && (b.max === null || grossIncome <= b.max));
   return band?.rate || 0;
 }
 
@@ -54,11 +56,15 @@ function getMarginalNIRate(grossIncome: number): number {
  * @param numberOfChildren - Number of children for child benefit
  * @returns Additional marginal rate percentage due to CB taper
  */
-function getChildBenefitMarginalImpact(adjustedNetIncome: number, numberOfChildren: number): number {
+function getChildBenefitMarginalImpact(
+  adjustedNetIncome: number,
+  numberOfChildren: number,
+  taxYear: number = DEFAULT_TAX_YEAR
+): number {
   if (numberOfChildren <= 0) return 0;
 
   const { taperStart, taperEnd, annualBenefitFirstChild, annualBenefitAdditionalChild } =
-    benefitsThresholds.childBenefit;
+    getBenefitsThresholds(taxYear).childBenefit;
 
   // Only applies within the taper zone
   if (adjustedNetIncome < taperStart || adjustedNetIncome >= taperEnd) {
@@ -85,9 +91,11 @@ function calculateHeadroom(
   adjustedNetIncome: number,
   taxableIncome: number,
   hasChildren: boolean,
-  region: TaxRegion
+  region: TaxRegion,
+  taxYear: number = DEFAULT_TAX_YEAR
 ): ThresholdHeadroom[] {
-  const config = getTaxConfig(region);
+  const config = getTaxConfig(region, taxYear);
+  const benefitsThresholds = getBenefitsThresholds(taxYear);
   const headroom: ThresholdHeadroom[] = [];
 
   // Child Benefit taper start (£60k)
@@ -163,7 +171,9 @@ function calculateHeadroom(
 function generateCliffEdgeWarnings(inputs: ScenarioInputs, results: CalculationResults): string[] {
   const warnings: string[] = [];
   const ani = results.adjustedNetIncome;
-  const config = getTaxConfig(inputs.taxRegion);
+  const taxYear = inputs.taxYear ?? DEFAULT_TAX_YEAR;
+  const config = getTaxConfig(inputs.taxRegion, taxYear);
+  const benefitsThresholds = getBenefitsThresholds(taxYear);
 
   // Get thresholds from constants
   const { taperStart: cbTaperStart, taperEnd: cbTaperEnd } = benefitsThresholds.childBenefit;
@@ -212,6 +222,9 @@ function generateCliffEdgeWarnings(inputs: ScenarioInputs, results: CalculationR
  * Main calculation function following the precise order from the plan
  */
 export function calculateAllResults(inputs: ScenarioInputs): CalculationResults {
+  // Tax year these figures are calculated in (2026 = 2026/27)
+  const taxYear = inputs.taxYear ?? DEFAULT_TAX_YEAR;
+
   // 1. Start with original gross salary, bonus, and cash car allowance
   const grossSalary = inputs.grossSalary;
   const bonusAmount = inputs.bonusAmount || 0;
@@ -253,19 +266,27 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
   const taxableIncome = grossAfterDeductions + bikTaxableAmount;
 
   // 8. Income tax
-  const incomeTax = calculateIncomeTax(taxableIncome, inputs.taxRegion);
+  const incomeTax = calculateIncomeTax(taxableIncome, inputs.taxRegion, taxYear);
 
   // 9. National Insurance (on gross after deductions, NOT including BIK)
-  const nationalInsurance = calculateNationalInsurance(grossAfterDeductions);
+  // NI can be supplied by callers that model uneven pay across the year (e.g. parental
+  // leave), where the per-pay-period basis differs materially from the annual basis.
+  const nationalInsurance =
+    inputs.nationalInsuranceOverride ??
+    calculateNationalInsurance(grossAfterDeductions, taxYear);
 
   // 9b. Student loan repayments (same pay basis as NI: post-sacrifice pay, excluding BIK)
   const studentLoanPlan = inputs.studentLoanPlan ?? 'none';
   const hasPostgradLoan = inputs.hasPostgradLoan ?? false;
-  const studentLoanRepayment = calculateStudentLoanRepayment(grossAfterDeductions, studentLoanPlan);
-  const postgradLoanRepayment = calculatePostgradLoanRepayment(grossAfterDeductions, hasPostgradLoan);
+  const studentLoanRepayment =
+    inputs.studentLoanOverride ??
+    calculateStudentLoanRepayment(grossAfterDeductions, studentLoanPlan, taxYear);
+  const postgradLoanRepayment =
+    inputs.postgradLoanOverride ??
+    calculatePostgradLoanRepayment(grossAfterDeductions, hasPostgradLoan, taxYear);
 
   // 10. BIK tax (approximate using marginal rate)
-  const currentMarginalTaxRate = getMarginalTaxRate(taxableIncome, inputs.taxRegion);
+  const currentMarginalTaxRate = getMarginalTaxRate(taxableIncome, inputs.taxRegion, taxYear);
   const bikTax = bikTaxableAmount * (currentMarginalTaxRate / 100);
 
   // 11. Adjusted Net Income (CRITICAL for benefits)
@@ -282,14 +303,15 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
     adjustedNetIncome,
     inputs.hasChildren,
     inputs.numberOfChildren,
-    inputs.taxRegion
+    inputs.taxRegion,
+    taxYear
   );
 
   // Child Benefit: only received (and only charged) if the family claims it.
   // The HICBC can never exceed the benefit, so claiming is never worse than not claiming.
   const claimsChildBenefit = inputs.hasChildren && (inputs.claimsChildBenefit ?? true);
   const childBenefitReceived = claimsChildBenefit
-    ? calculateAnnualChildBenefit(inputs.numberOfChildren)
+    ? calculateAnnualChildBenefit(inputs.numberOfChildren, taxYear)
     : 0;
   const childBenefitCharge = claimsChildBenefit ? benefitsImpact.childBenefitCharge : 0;
   const netChildBenefit = childBenefitReceived - childBenefitCharge;
@@ -314,19 +336,20 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
   const effectiveTaxRate = totalGrossIncome > 0 ? (taxesPaid / totalGrossIncome) * 100 : 0;
 
   // 15. Calculate marginal rates
-  const marginalTaxRate = getMarginalTaxRate(taxableIncome, inputs.taxRegion);
-  const marginalNIRate = getMarginalNIRate(grossAfterDeductions);
+  const marginalTaxRate = getMarginalTaxRate(taxableIncome, inputs.taxRegion, taxYear);
+  const marginalNIRate = getMarginalNIRate(grossAfterDeductions, taxYear);
 
   // Calculate Child Benefit taper impact if applicable (only bites if claiming)
   const childBenefitMarginalImpact = claimsChildBenefit
-    ? getChildBenefitMarginalImpact(adjustedNetIncome, inputs.numberOfChildren)
+    ? getChildBenefitMarginalImpact(adjustedNetIncome, inputs.numberOfChildren, taxYear)
     : 0;
 
   // Marginal student loan rate on the next £1 of pay
   const marginalStudentLoanRate = getMarginalStudentLoanRate(
     grossAfterDeductions,
     studentLoanPlan,
-    hasPostgradLoan
+    hasPostgradLoan,
+    taxYear
   );
 
   // Combined rate includes income tax, NI, student loan, and child benefit taper effect
@@ -334,7 +357,13 @@ export function calculateAllResults(inputs: ScenarioInputs): CalculationResults 
     marginalTaxRate + marginalNIRate + marginalStudentLoanRate + childBenefitMarginalImpact;
 
   // 16. Calculate headroom to thresholds
-  const headroom = calculateHeadroom(adjustedNetIncome, taxableIncome, inputs.hasChildren, inputs.taxRegion);
+  const headroom = calculateHeadroom(
+    adjustedNetIncome,
+    taxableIncome,
+    inputs.hasChildren,
+    inputs.taxRegion,
+    taxYear
+  );
 
   // 17. Pension projections (including sacrificed bonus)
   const totalPensionContribution = totalEmployeePensionContribution + employerPension;

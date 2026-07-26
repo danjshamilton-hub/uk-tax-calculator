@@ -111,11 +111,6 @@ export const taxYearMonths = [
   { value: 12, label: 'March', calendarMonth: 3 },
 ];
 
-/**
- * Format tax year string from starting year
- * @param startYear - e.g., 2025
- * @returns e.g., "2025/26"
- */
-export function formatTaxYear(startYear: number): string {
-  return `${startYear}/${(startYear + 1).toString().slice(-2)}`;
-}
+// Re-exported for the existing call sites; the canonical definition lives with
+// the tax year registry.
+export { formatTaxYear } from './taxYears';

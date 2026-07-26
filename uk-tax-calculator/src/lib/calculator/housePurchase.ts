@@ -1,7 +1,7 @@
 // House Purchase Analysis with 3-Part Affordability Check
 
 import type { HousePurchaseInputs, HousePurchaseResults } from '../../types/scenario';
-import type { TaxRegion } from '../../data/taxRates2025';
+import type { TaxRegion } from '../../data/taxYears';
 import { calculateIncomeTax } from './incomeTax';
 import { calculateNationalInsurance } from './nationalInsurance';
 import { calculateLBTT } from './lbtt';
