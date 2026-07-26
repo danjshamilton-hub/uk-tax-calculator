@@ -11,7 +11,9 @@ import type {
   ScenarioBState,
   HouseState,
   BudgetState,
+  MaternityState,
 } from './types/appState';
+import { DEFAULT_MATERNITY } from './types/appState';
 import { constants } from './data/constants';
 import { usePersistedState } from './hooks/usePersistedState';
 
@@ -19,10 +21,11 @@ import { SalaryTab } from './components/SalaryTab';
 import { HousePurchaseTab } from './components/HousePurchaseTab';
 import { ProjectionsTab } from './components/ProjectionsTab';
 import { BudgetingTab } from './components/BudgetingTab';
+import { MaternityTab } from './components/MaternityTab';
 
 function App() {
   // ─── Persisted grouped state ───
-  const [activeTab, setActiveTab] = usePersistedState<'salary' | 'house' | 'projections' | 'budget'>('app:activeTab', 'salary');
+  const [activeTab, setActiveTab] = usePersistedState<'salary' | 'house' | 'projections' | 'budget' | 'maternity'>('app:activeTab', 'salary');
   const [compareMode, setCompareMode] = usePersistedState('app:compareMode', false);
 
   const [salary, setSalary] = usePersistedState<SalaryState>('app:salary', {
@@ -78,6 +81,8 @@ function App() {
     useGrossForMortgage: false,
     mortgageMaxOverride: 0,
   });
+
+  const [maternity, setMaternity] = usePersistedState<MaternityState>('app:maternity', DEFAULT_MATERNITY);
 
   const [budget, setBudget] = usePersistedState<BudgetState>('app:budget', {
     expenses: [],
@@ -219,6 +224,9 @@ function App() {
         <button className={tabCls(activeTab === 'budget')} onClick={() => setActiveTab('budget')}>
           Budget
         </button>
+        <button className={tabCls(activeTab === 'maternity')} onClick={() => setActiveTab('maternity')}>
+          Maternity &amp; Paternity
+        </button>
       </div>
 
       {/* Salary Tab */}
@@ -276,6 +284,16 @@ function App() {
           carBIKPercentage={companyCar.carBIKPercentage}
           studentLoanPlan={salary.studentLoanPlan ?? 'none'}
           hasPostgradLoan={salary.hasPostgradLoan ?? false}
+        />
+      )}
+
+      {/* Maternity & Paternity Tab */}
+      {activeTab === 'maternity' && (
+        <MaternityTab
+          maternity={maternity}
+          setMaternity={setMaternity}
+          salary={salary}
+          children={children}
         />
       )}
 

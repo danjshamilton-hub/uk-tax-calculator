@@ -348,6 +348,35 @@ describe('monthly cashflow', () => {
     expect(lowest.householdNet).toBeLessThan(lowest.householdNetBaseline);
   });
 
+  it('matches the baseline exactly in months before any leave starts', () => {
+    // Cumulative PAYE means a month of unchanged pay before the leave begins
+    // must deduct exactly what it would have anyway.
+    const result = calculateMaternityResults(
+      inputs({ birthDate: '2026-09-01', plan2: partnerPlan({ paternityLeaveWeeks: 0 }) })
+    );
+
+    const beforeLeave = result.monthlyCashflow.filter(
+      (m) => m.parent1.status === 'working' && m.taxMonth <= 4 && m.taxYear === 2026
+    );
+    expect(beforeLeave.length).toBeGreaterThan(0);
+    for (const month of beforeLeave) {
+      expect(month.parent1.takeHome).toBeCloseTo(month.parent1.takeHomeBaseline, 2);
+      expect(month.householdNet).toBeCloseTo(month.householdNetBaseline, 2);
+    }
+  });
+
+  it('refunds tax in the months where pay drops', () => {
+    const result = calculateMaternityResults(
+      inputs({ birthDate: '2026-04-20', plan2: partnerPlan({ paternityLeaveWeeks: 0 }) })
+    );
+    // Deep into statutory-only pay, cumulative PAYE gives tax back
+    const statutoryMonths = result.monthlyCashflow.filter(
+      (m) => m.parent1.payLabel === 'SMP'
+    );
+    expect(statutoryMonths.length).toBeGreaterThan(0);
+    expect(statutoryMonths.some((m) => m.parent1.incomeTax < 0)).toBe(true);
+  });
+
   it('labels each month with the pay the parent is on', () => {
     const result = calculateMaternityResults(inputs());
     const labels = new Set(result.monthlyCashflow.map((m) => m.parent1.payLabel));

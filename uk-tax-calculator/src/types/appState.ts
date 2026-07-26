@@ -1,6 +1,7 @@
 import type { TaxRegion } from '../data/taxYears';
 import type { StudentLoanPlan } from '../data/taxYears';
 import type { BudgetExpense } from './budget';
+import type { ParentLeavePlan } from './maternity';
 
 /** Salary & personal details (shared between scenarios) */
 export interface SalaryState {
@@ -64,6 +65,22 @@ export interface HouseState {
   mortgageMaxOverride: number;
 }
 
+/** Maternity & paternity tab state */
+export interface MaternityState {
+  birthDate: string; // ISO yyyy-mm-dd
+
+  // Partner 2's own details (Partner 1 comes from the Salary tab)
+  partner2GrossSalary: number;
+  partner2TaxRegion: TaxRegion;
+  partner2EmployeePensionPercentage: number;
+  partner2EmployerPensionPercentage: number;
+  partner2StudentLoanPlan: StudentLoanPlan;
+  partner2HasPostgradLoan: boolean;
+
+  plan1: ParentLeavePlan;
+  plan2: ParentLeavePlan;
+}
+
 /** Budget tab state */
 export interface BudgetState {
   expenses: BudgetExpense[];
@@ -116,6 +133,50 @@ export const DEFAULT_SCENARIO_B: ScenarioBState = {
   employerPensionPercentage: undefined,
   companyCar: { ...DEFAULT_COMPANY_CAR },
   bonus: { ...DEFAULT_BONUS },
+};
+
+export const DEFAULT_MATERNITY: MaternityState = {
+  // Default to a birth early in the next tax year
+  birthDate: '2026-09-01',
+
+  partner2GrossSalary: 40000,
+  partner2TaxRegion: 'scotland',
+  partner2EmployeePensionPercentage: 5,
+  partner2EmployerPensionPercentage: 3,
+  partner2StudentLoanPlan: 'none',
+  partner2HasPostgradLoan: false,
+
+  plan1: {
+    role: 'birthParent',
+    maternityLeaveWeeks: 39,
+    paternityLeaveWeeks: 0,
+    sharedLeaveWeeksTaken: 0,
+    sharedPaidWeeksTaken: 0,
+    startWeekOffset: 0,
+    // A common UK occupational scheme: 3 months full pay, 3 months half pay,
+    // then statutory for the rest of the paid period
+    payBands: [
+      { weeks: 13, mode: 'fullPay' },
+      { weeks: 13, mode: 'percentOfSalary', percent: 50 },
+      { weeks: 13, mode: 'statutory' },
+    ],
+    returnSalaryPercent: 100,
+    employeePensionPercentDuringLeave: 5,
+    employerMaintainsPension: true,
+  },
+
+  plan2: {
+    role: 'partner',
+    maternityLeaveWeeks: 0,
+    paternityLeaveWeeks: 2,
+    sharedLeaveWeeksTaken: 0,
+    sharedPaidWeeksTaken: 0,
+    startWeekOffset: 0,
+    payBands: [{ weeks: 2, mode: 'fullPay' }],
+    returnSalaryPercent: 100,
+    employeePensionPercentDuringLeave: 5,
+    employerMaintainsPension: true,
+  },
 };
 
 export const DEFAULT_HOUSE: HouseState = {

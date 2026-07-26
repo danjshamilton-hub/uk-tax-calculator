@@ -27,6 +27,7 @@ import type {
 import type { ScenarioInputs } from '../../types/scenario';
 import { calculateAllResults } from './index';
 import { calculateNIForPeriod } from './nationalInsurance';
+import { calculateIncomeTax } from './incomeTax';
 import {
   calculateStudentLoanForPeriod,
   calculatePostgradLoanForPeriod,
@@ -467,14 +468,30 @@ function computeParentYear(
 
   const yearResult = calculateAllResults(scenario);
 
-  // Apportion the year's income tax across months by share of gross pay. PAYE is
-  // cumulative, so a year of falling pay settles to roughly this by year end.
+  // Income tax month by month on the cumulative PAYE basis: annualise the pay
+  // received so far, tax it, take the elapsed fraction, and deduct whatever has
+  // already been paid. When pay falls mid-year this naturally produces a refund,
+  // which is what actually happens on a payslip during parental leave. By month
+  // 12 the running total equals the annual figure exactly.
+  let cumulativeTaxablePay = 0;
+  let taxPaidToDate = 0;
+
   const monthDetails = months.map(({ month, totals }, i) => {
-    const share = annualGross > 0 ? totals.gross / annualGross : 1 / 12;
-    const incomeTax = yearResult.incomeTax * share;
+    const taxablePay = Math.max(0, totals.gross - totals.employeePension);
+    cumulativeTaxablePay += taxablePay;
+
+    const periodsElapsed = i + 1;
+    const annualisedTax = calculateIncomeTax(
+      cumulativeTaxablePay * (12 / periodsElapsed),
+      profile.taxRegion,
+      taxYear
+    );
+    const taxDueToDate = annualisedTax * (periodsElapsed / 12);
+    const incomeTax = taxDueToDate - taxPaidToDate;
+    taxPaidToDate = taxDueToDate;
+
     const { nationalInsurance, studentLoan } = monthlyDeductions[i];
-    const takeHome =
-      totals.gross - totals.employeePension - incomeTax - nationalInsurance - studentLoan;
+    const takeHome = taxablePay - incomeTax - nationalInsurance - studentLoan;
 
     return { month, totals, incomeTax, nationalInsurance, studentLoan, takeHome };
   });
