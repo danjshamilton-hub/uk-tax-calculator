@@ -156,19 +156,15 @@ function getLeaveWindow(plan: ParentLeavePlan): LeaveWindow {
   };
 }
 
-/** The block a week falls in, and how far into that parent's leave it is */
+/** The block a week falls in, and how far into that block it is */
 function findLeaveWeek(
   window: LeaveWindow,
   weekIndex: number
-): { block: LeaveBlock; indexInBlock: number; cumulativeLeaveWeek: number } | null {
-  let consumed = 0;
-
+): { block: LeaveBlock; indexInBlock: number } | null {
   for (const block of window.blocks) {
     if (weekIndex >= block.startWeek && weekIndex < block.endWeek) {
-      const indexInBlock = weekIndex - block.startWeek;
-      return { block, indexInBlock, cumulativeLeaveWeek: consumed + indexInBlock };
+      return { block, indexInBlock: weekIndex - block.startWeek };
     }
-    consumed += block.weeks;
   }
 
   return null;
@@ -212,19 +208,26 @@ interface WeeklyContext {
 /** Occupational (employer scheme) pay for a given week of leave, and its label */
 function occupationalPay(
   ctx: WeeklyContext,
-  leaveWeekIndex: number,
+  block: LeaveBlock,
+  indexInBlock: number,
   weeklySalary: number
 ): { amount: number; label: string } {
+  // Each block has its own scheme, counted from the start of that block, so
+  // enhanced shared parental pay does not move when paternity weeks change.
+  const bands = block.kind === 'shared' ? ctx.plan.sharedPayBands : ctx.plan.payBands;
   let consumed = 0;
 
-  for (const band of ctx.plan.payBands) {
+  for (const band of bands ?? []) {
     const weeks = Math.max(0, band.weeks);
-    if (leaveWeekIndex < consumed + weeks) {
+    if (indexInBlock < consumed + weeks) {
       switch (band.mode) {
         case 'fullPay':
           return { amount: weeklySalary, label: 'Full pay' };
         case 'percentOfSalary': {
-          const percent = band.percent ?? 0;
+          // A band flagged as a percentage but missing its value means the
+          // scheme pays a share of salary, not nothing; fall back to statutory
+          // by treating it as no occupational entitlement only when explicitly 0.
+          const percent = band.percent ?? 50;
           return {
             amount: weeklySalary * (percent / 100),
             label: `${percent}% pay`,
@@ -327,9 +330,9 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
       };
     }
 
-    const { block, indexInBlock, cumulativeLeaveWeek } = leaveWeek;
+    const { block, indexInBlock } = leaveWeek;
     const statutory = statutoryPayForWeek(ctx, block, indexInBlock, weekIndex);
-    const occupational = occupationalPay(ctx, cumulativeLeaveWeek, weeklySalary);
+    const occupational = occupationalPay(ctx, block, indexInBlock, weeklySalary);
 
     // Employer schemes are inclusive of statutory pay: the employer tops up to
     // the enhanced rate rather than paying it on top.

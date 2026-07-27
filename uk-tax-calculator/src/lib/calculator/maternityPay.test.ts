@@ -44,6 +44,7 @@ function birthPlan(overrides: Partial<ParentLeavePlan> = {}): ParentLeavePlan {
     startWeekOffset: 0,
     sharedStartWeekOffset: 0,
     payBands: [{ weeks: 52, mode: 'statutory' }],
+    sharedPayBands: [{ weeks: 52, mode: 'statutory' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
@@ -65,6 +66,7 @@ function partnerPlan(overrides: Partial<ParentLeavePlan> = {}): ParentLeavePlan 
     // Shared leave starts once the paternity block ends
     sharedStartWeekOffset: 2,
     payBands: [{ weeks: 52, mode: 'statutory' }],
+    sharedPayBands: [{ weeks: 52, mode: 'statutory' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
@@ -307,6 +309,61 @@ describe('separate leave blocks', () => {
     // Working months appear between the paternity month and the shared months
     expect(statuses).toContain('working');
     expect(statuses).toContain('shared');
+  });
+
+  it('pays enhanced shared parental pay from its own scheme', () => {
+    const schedule = getWeeklySchedule(
+      inputs({
+        plan1: birthPlan({ maternityLeaveWeeks: 26 }),
+        plan2: partnerPlan({
+          paternityLeaveWeeks: 2,
+          payBands: [{ weeks: 2, mode: 'fullPay' }],
+          sharedLeaveWeeksTaken: 12,
+          sharedPaidWeeksTaken: 12,
+          sharedStartWeekOffset: 26,
+          // The employer tops shared parental leave up to half pay
+          sharedPayBands: [{ weeks: 12, mode: 'percentOfSalary', percent: 50 }],
+        }),
+      }),
+      2
+    );
+
+    const weeklySalary = 52000 / 52;
+    const paternity = schedule.filter((w) => w.weekIndex < 2);
+    const shared = schedule.filter((w) => w.weekIndex >= 26);
+
+    expect(paternity).toHaveLength(2);
+    for (const week of paternity) {
+      expect(week.gross).toBeCloseTo(weeklySalary, 2);
+      expect(week.payLabel).toBe('Full pay');
+    }
+
+    expect(shared).toHaveLength(12);
+    for (const week of shared) {
+      expect(week.gross).toBeCloseTo(weeklySalary * 0.5, 2);
+      expect(week.payLabel).toBe('50% pay');
+    }
+  });
+
+  it('does not shift the shared scheme when paternity weeks change', () => {
+    const build = (paternityWeeks: number) =>
+      getWeeklySchedule(
+        inputs({
+          plan1: birthPlan({ maternityLeaveWeeks: 26 }),
+          plan2: partnerPlan({
+            paternityLeaveWeeks: paternityWeeks,
+            sharedLeaveWeeksTaken: 10,
+            sharedPaidWeeksTaken: 10,
+            sharedStartWeekOffset: 26,
+            sharedPayBands: [{ weeks: 10, mode: 'percentOfSalary', percent: 50 }],
+          }),
+        }),
+        2
+      ).filter((w) => w.weekIndex >= 26);
+
+    // The shared weeks pay the same whether or not paternity leave was taken
+    expect(build(0).map((w) => w.gross)).toEqual(build(2).map((w) => w.gross));
+    expect(build(2).every((w) => w.payLabel === '50% pay')).toBe(true);
   });
 
   it('warns when the shared block overlaps the paternity block', () => {

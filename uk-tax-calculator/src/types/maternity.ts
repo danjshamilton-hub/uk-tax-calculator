@@ -78,8 +78,19 @@ export interface ParentLeavePlan {
    */
   sharedStartWeekOffset: number;
 
-  /** Employer's own scheme, applied across the leave in order */
+  /**
+   * Employer's scheme for the maternity block (birth parent) or the paternity
+   * block (partner), applied in order from the start of that block.
+   */
   payBands: LeavePayBand[];
+
+  /**
+   * Employer's scheme for the Shared Parental Leave block, applied in order
+   * from the start of that block. Kept separate because enhanced shared
+   * parental pay is its own entitlement and must not shift when the paternity
+   * weeks change.
+   */
+  sharedPayBands: LeavePayBand[];
 
   /** Salary on return to work, as a percentage of pre-leave salary */
   returnSalaryPercent: number;

@@ -178,6 +178,7 @@ export function MaternityTab({
           </div>
 
           <PayBandEditor
+            title="Employer maternity scheme"
             bands={maternity.plan1.payBands}
             onChange={bands => updatePlan('plan1', { payBands: bands })}
           />
@@ -229,6 +230,12 @@ export function MaternityTab({
                 </div>
               </div>
 
+              <PayBandEditor
+                title="Employer paternity scheme"
+                bands={maternity.plan2.payBands}
+                onChange={bands => updatePlan('plan2', { payBands: bands })}
+              />
+
               {/* Shared parental leave, with its own start and live pot balances */}
               <div className="bg-teal-50 p-3 rounded-md mb-3">
                 <div className="font-semibold text-sm mb-2">Shared Parental Leave</div>
@@ -275,6 +282,15 @@ export function MaternityTab({
                     leave months later.
                   </span>
                 </div>
+                <div className="mt-3">
+                  <PayBandEditor
+                    title="Employer shared parental scheme"
+                    help="Counted from the start of the shared block, so it does not shift when the paternity weeks change."
+                    bands={maternity.plan2.sharedPayBands}
+                    onChange={bands => updatePlan('plan2', { sharedPayBands: bands })}
+                  />
+                </div>
+
                 <div className="text-[11px] text-gray-600 mt-2 leading-relaxed">
                   Partner 1 taking {maternity.plan1.maternityLeaveWeeks} weeks releases{' '}
                   <strong>{pots.leaveAvailable} leave weeks</strong> and{' '}
@@ -285,11 +301,6 @@ export function MaternityTab({
                   the paid pot is unpaid.
                 </div>
               </div>
-
-              <PayBandEditor
-                bands={maternity.plan2.payBands}
-                onChange={bands => updatePlan('plan2', { payBands: bands })}
-              />
 
               <ReturnAndPension
                 plan={maternity.plan2}
@@ -714,9 +725,13 @@ function BenefitRow({
 }
 
 function PayBandEditor({
+  title,
+  help,
   bands,
   onChange,
 }: {
+  title: string;
+  help?: string;
   bands: LeavePayBand[];
   onChange: (bands: LeavePayBand[]) => void;
 }) {
@@ -727,7 +742,7 @@ function PayBandEditor({
 
   return (
     <div className="mb-3">
-      <label className={labelCls}>Employer scheme</label>
+      <label className={labelCls}>{title}</label>
       {bands.map((band, i) => (
         <div key={i} className="flex gap-2 mb-2 items-center">
           <input
@@ -741,7 +756,13 @@ function PayBandEditor({
           <span className="text-[12px] text-gray-500">wks</span>
           <select
             value={band.mode}
-            onChange={e => updateBand(i, { mode: e.target.value as LeavePayMode })}
+            onChange={e => {
+              const mode = e.target.value as LeavePayMode;
+              // Switching to a percentage must commit a real value, not just
+              // show one: an undefined percent computes as 0% and silently
+              // falls back to statutory pay.
+              updateBand(i, mode === 'percentOfSalary' ? { mode, percent: band.percent ?? 50 } : { mode });
+            }}
             className={inputCls}
             aria-label="Pay level"
           >
@@ -781,6 +802,7 @@ function PayBandEditor({
       <div className="text-[11px] text-gray-500 mt-1">
         {totalWeeks} weeks covered. Each week pays the higher of the employer scheme and statutory
         pay — schemes top up rather than stack.
+        {help && <> {help}</>}
       </div>
     </div>
   );

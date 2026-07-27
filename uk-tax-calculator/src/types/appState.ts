@@ -193,6 +193,7 @@ export const DEFAULT_MATERNITY: MaternityState = {
       { weeks: 13, mode: 'percentOfSalary', percent: 50 },
       { weeks: 13, mode: 'statutory' },
     ],
+    sharedPayBands: [{ weeks: 52, mode: 'statutory' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
@@ -210,7 +211,10 @@ export const DEFAULT_MATERNITY: MaternityState = {
     startWeekOffset: 0,
     // Shared leave usually starts once the birth parent's leave is winding down
     sharedStartWeekOffset: 26,
+    // Paternity is usually paid in full by the employer; shared parental pay
+    // defaults to statutory until told otherwise.
     payBands: [{ weeks: 2, mode: 'fullPay' }],
+    sharedPayBands: [{ weeks: 52, mode: 'statutory' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
