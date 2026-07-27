@@ -29,8 +29,11 @@ export function analyzeHousePurchase(
   yourAnnualTakeHome: number,
   region: TaxRegion
 ): HousePurchaseResults {
-  // 1. Calculate partner's income
-  const partnerAnnualTakeHome = calculatePartnerTakeHome(inputs.partnerGrossSalary, region);
+  // 1. Partner's income. Prefer the figure calculated from their full profile;
+  // fall back to the simplified estimate when none is supplied.
+  const partnerAnnualTakeHome =
+    inputs.partnerAnnualTakeHomeOverride ??
+    calculatePartnerTakeHome(inputs.partnerGrossSalary, region);
   const combinedAnnualTakeHome = yourAnnualTakeHome + partnerAnnualTakeHome;
   const combinedMonthlyTakeHome = combinedAnnualTakeHome / 12;
 

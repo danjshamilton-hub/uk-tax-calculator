@@ -246,6 +246,11 @@ export function BudgetingTab(props: BudgetingTabProps) {
                 onChange={(e) => props.setPartner2TakeHome(safeNumber(e.target.value, 0))}
                 className={inputCls}
               />
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                {props.partner2TakeHome
+                  ? 'Manual override — clear to use the Salary tab figure'
+                  : 'From Salary tab (Partner 2)'}
+              </div>
             </div>
           </div>
 

@@ -63,6 +63,12 @@ export interface HousePurchaseInputs {
 
   // Income (for combined affordability)
   partnerGrossSalary: number; // Partner's annual gross salary (0 if single)
+  /**
+   * Partner's take-home, calculated properly from their full profile on the
+   * Salary tab. When supplied it replaces this module's simplified estimate,
+   * which ignores pension, car and student loan.
+   */
+  partnerAnnualTakeHomeOverride?: number;
 
   // Cash position
   currentBalance: number; // Current savings

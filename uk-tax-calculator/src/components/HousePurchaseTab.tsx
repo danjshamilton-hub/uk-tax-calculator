@@ -12,6 +12,9 @@ interface HousePurchaseTabProps {
   taxRegion: TaxRegion;
   setTaxRegion: (r: TaxRegion) => void;
   resultA: CalculationResults;
+  /** Partner 2's gross salary from the Salary tab, 0 when not included */
+  partnerGrossSalary: number;
+  partnerIncluded: boolean;
 }
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm box-border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
@@ -24,6 +27,7 @@ export function HousePurchaseTab({
   house, setHouse,
   grossSalary, adjustedAnnual, taxRegion, setTaxRegion,
   resultA,
+  partnerGrossSalary, partnerIncluded,
 }: HousePurchaseTabProps) {
   const update = (updates: Partial<HouseState>) => setHouse(prev => ({ ...prev, ...updates }));
   const hp = resultA.housePurchase;
@@ -45,12 +49,22 @@ export function HousePurchaseTab({
         {/* Partner Income */}
         <div className={sectionCls}>
           <h2 className={sectionHeaderCls}>Partner Income</h2>
-          <div className={fieldCls}>
-            <label className={labelCls}>Partner Gross Salary (£/year)</label>
-            <input type="number" value={house.partnerGrossSalary} onChange={e => update({ partnerGrossSalary: safeNumber(e.target.value) })} className={inputCls} />
-            <span className="text-[11px] text-gray-500">Enter 0 if no partner or single applicant</span>
-          </div>
-          {house.partnerGrossSalary > 0 && hp && (
+          {partnerIncluded ? (
+            <div className="bg-white p-3 rounded-md mb-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Partner 2 gross salary</span>
+                <span className="font-medium">{formatCurrency(partnerGrossSalary)}</span>
+              </div>
+              <div className="text-[11px] text-gray-500 mt-2">
+                From the Salary tab, including their pension, car and student loan.
+              </div>
+            </div>
+          ) : (
+            <div className="text-[13px] text-gray-500 mb-2">
+              No second earner. Add Partner 2 on the Salary tab to include their income here.
+            </div>
+          )}
+          {partnerIncluded && hp && (
             <div className="bg-green-50 p-3 rounded-md mt-2">
               <div className="flex justify-between mb-1">
                 <span>Partner take-home:</span>
@@ -145,7 +159,7 @@ export function HousePurchaseTab({
             </label>
             <div className="text-xs text-gray-500 mt-1 ml-[26px]">
               {house.useGrossForMortgage
-                ? `Using combined gross: ${formatCurrency(grossSalary + house.partnerGrossSalary)}`
+                ? `Using combined gross: ${formatCurrency(grossSalary + partnerGrossSalary)}`
                 : 'Default: uses combined annual take-home pay'}
             </div>
           </div>
@@ -196,7 +210,7 @@ export function HousePurchaseTab({
                     <td className="py-2">Your take-home</td>
                     <td className="text-right">{formatCurrency(hp.yourAnnualTakeHome)}</td>
                   </tr>
-                  {house.partnerGrossSalary > 0 && (
+                  {partnerIncluded && (
                     <tr>
                       <td className="py-2">Partner take-home</td>
                       <td className="text-right">{formatCurrency(hp.partnerAnnualTakeHome)}</td>
