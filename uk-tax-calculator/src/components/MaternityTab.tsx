@@ -1,5 +1,12 @@
 import { useMemo } from 'react';
-import type { MaternityState, SalaryState, ChildrenState } from '../types/appState';
+import type {
+  MaternityState,
+  SalaryState,
+  ChildrenState,
+  CompanyCarState,
+  BonusState,
+  Partner2State,
+} from '../types/appState';
 import type {
   LeavePayBand,
   LeavePayMode,
@@ -8,8 +15,7 @@ import type {
   ParentProfile,
   WeekStatus,
 } from '../types/maternity';
-import type { TaxRegion, StudentLoanPlan } from '../data/taxYears';
-import { getStudentLoanPlans, DEFAULT_TAX_YEAR } from '../data/taxYears';
+import { DEFAULT_TAX_YEAR } from '../data/taxYears';
 import { calculateMaternityResults, calculateSharedPots } from '../lib/calculator/maternityPay';
 import { formatCurrency, safeNumber } from '../lib/utils/formatters';
 
@@ -32,16 +38,28 @@ interface MaternityTabProps {
   maternity: MaternityState;
   setMaternity: (value: MaternityState | ((prev: MaternityState) => MaternityState)) => void;
   salary: SalaryState;
+  companyCar: CompanyCarState;
+  bonus: BonusState;
+  partner2: Partner2State;
   children: ChildrenState;
 }
 
-export function MaternityTab({ maternity, setMaternity, salary, children }: MaternityTabProps) {
+export function MaternityTab({
+  maternity,
+  setMaternity,
+  salary,
+  companyCar,
+  bonus,
+  partner2,
+  children,
+}: MaternityTabProps) {
   const update = (updates: Partial<MaternityState>) =>
     setMaternity(prev => ({ ...prev, ...updates }));
 
   const updatePlan = (which: 'plan1' | 'plan2', updates: Partial<ParentLeavePlan>) =>
     setMaternity(prev => ({ ...prev, [which]: { ...prev[which], ...updates } }));
 
+  // Both profiles come from the Salary tab; this tab only plans the leave.
   const parent1: ParentProfile = useMemo(() => ({
     label: 'Partner 1',
     grossSalary: salary.grossSalary,
@@ -52,19 +70,35 @@ export function MaternityTab({ maternity, setMaternity, salary, children }: Mate
     hasPostgradLoan: salary.hasPostgradLoan ?? false,
     currentAge: salary.currentAge,
     retirementAge: salary.retirementAge,
-  }), [salary]);
+    bonusAmount: bonus.bonusAmount,
+    bonusSacrificePercentage: bonus.bonusSacrificePercentage,
+    hasCompanyCar: companyCar.hasCompanyCar,
+    carSalarySacrificeAnnual: companyCar.hasCompanyCar ? companyCar.carSalarySacrifice * 12 : 0,
+    carP11DValue: companyCar.carP11DValue,
+    carBIKPercentage: companyCar.carBIKPercentage,
+    carAllowanceAnnual: (companyCar.carAllowance ?? 0) * 12,
+  }), [salary, companyCar, bonus]);
 
   const parent2: ParentProfile = useMemo(() => ({
     label: 'Partner 2',
-    grossSalary: maternity.partner2GrossSalary,
-    taxRegion: maternity.partner2TaxRegion,
-    employeePensionPercentage: maternity.partner2EmployeePensionPercentage,
-    employerPensionPercentage: maternity.partner2EmployerPensionPercentage,
-    studentLoanPlan: maternity.partner2StudentLoanPlan,
-    hasPostgradLoan: maternity.partner2HasPostgradLoan,
-    currentAge: salary.currentAge,
-    retirementAge: salary.retirementAge,
-  }), [maternity, salary.currentAge, salary.retirementAge]);
+    grossSalary: partner2.enabled ? partner2.grossSalary : 0,
+    taxRegion: partner2.taxRegion,
+    employeePensionPercentage: partner2.employeePensionPercentage,
+    employerPensionPercentage: partner2.employerPensionPercentage,
+    studentLoanPlan: partner2.studentLoanPlan ?? 'none',
+    hasPostgradLoan: partner2.hasPostgradLoan ?? false,
+    currentAge: partner2.currentAge,
+    retirementAge: partner2.retirementAge,
+    bonusAmount: partner2.bonus.bonusAmount,
+    bonusSacrificePercentage: partner2.bonus.bonusSacrificePercentage,
+    hasCompanyCar: partner2.companyCar.hasCompanyCar,
+    carSalarySacrificeAnnual: partner2.companyCar.hasCompanyCar
+      ? partner2.companyCar.carSalarySacrifice * 12
+      : 0,
+    carP11DValue: partner2.companyCar.carP11DValue,
+    carBIKPercentage: partner2.companyCar.carBIKPercentage,
+    carAllowanceAnnual: (partner2.companyCar.carAllowance ?? 0) * 12,
+  }), [partner2]);
 
   const inputs: MaternityInputs = useMemo(() => ({
     birthDate: maternity.birthDate,
@@ -109,26 +143,10 @@ export function MaternityTab({ maternity, setMaternity, salary, children }: Mate
           </div>
         </div>
 
-        {/* Partner 1 */}
+        {/* Partner 1 — birth parent */}
         <div className={sectionCls}>
           <h2 className={sectionHeaderCls}>Partner 1 (birth parent)</h2>
-          <div className="bg-white p-3 rounded-md mb-3 text-sm">
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Gross salary</span>
-              <span className="font-medium">{formatCurrency(salary.grossSalary)}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Pension</span>
-              <span className="font-medium">
-                {salary.employeePensionPercentage}% + {salary.employerPensionPercentage}% employer
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Region</span>
-              <span className="font-medium capitalize">{salary.taxRegion}</span>
-            </div>
-            <div className="text-[11px] text-gray-500 mt-2">Edit these on the Salary tab.</div>
-          </div>
+          <ProfileSummary profile={parent1} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className={fieldCls}>
@@ -166,7 +184,8 @@ export function MaternityTab({ maternity, setMaternity, salary, children }: Mate
 
           <ReturnAndPension
             plan={maternity.plan1}
-            normalPensionPercent={salary.employeePensionPercentage}
+            profile={parent1}
+            normalPensionPercent={parent1.employeePensionPercentage}
             onChange={updates => updatePlan('plan1', updates)}
           />
         </div>
@@ -175,149 +194,114 @@ export function MaternityTab({ maternity, setMaternity, salary, children }: Mate
         <div className={sectionCls}>
           <h2 className={sectionHeaderCls}>Partner 2</h2>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className={fieldCls}>
-              <label className={labelCls}>Gross salary (£/year)</label>
-              <input
-                type="number"
-                value={maternity.partner2GrossSalary}
-                onChange={e => update({ partner2GrossSalary: safeNumber(e.target.value) })}
-                className={inputCls}
-              />
-            </div>
-            <div className={fieldCls}>
-              <label className={labelCls}>Tax region</label>
-              <select
-                value={maternity.partner2TaxRegion}
-                onChange={e => update({ partner2TaxRegion: e.target.value as TaxRegion })}
-                className={inputCls}
-              >
-                <option value="scotland">Scotland</option>
-                <option value="england">England / Wales / NI</option>
-              </select>
-            </div>
-          </div>
+          {!partner2.enabled ? (
+            <p className="text-[13px] text-gray-500">
+              No second earner. Add Partner 2 on the Salary tab to plan their leave.
+            </p>
+          ) : (
+            <>
+              <ProfileSummary profile={parent2} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className={fieldCls}>
-              <label className={labelCls}>Employee pension (%)</label>
-              <input
-                type="number"
-                value={maternity.partner2EmployeePensionPercentage}
-                onChange={e =>
-                  update({ partner2EmployeePensionPercentage: safeNumber(e.target.value) })
-                }
-                className={inputCls}
-              />
-            </div>
-            <div className={fieldCls}>
-              <label className={labelCls}>Employer pension (%)</label>
-              <input
-                type="number"
-                value={maternity.partner2EmployerPensionPercentage}
-                onChange={e =>
-                  update({ partner2EmployerPensionPercentage: safeNumber(e.target.value) })
-                }
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className={fieldCls}>
-            <label className={labelCls}>Student loan</label>
-            <select
-              value={maternity.partner2StudentLoanPlan}
-              onChange={e => update({ partner2StudentLoanPlan: e.target.value as StudentLoanPlan })}
-              className={inputCls}
-            >
-              <option value="none">None</option>
-              {Object.entries(getStudentLoanPlans(DEFAULT_TAX_YEAR)).map(([id, cfg]) => (
-                <option key={id} value={id}>
-                  {cfg.label} — {cfg.rate}% over £{cfg.threshold.toLocaleString()}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className={fieldCls}>
-              <label className={labelCls}>Paternity leave (weeks)</label>
-              <input
-                type="number"
-                min={0}
-                max={2}
-                value={maternity.plan2.paternityLeaveWeeks}
-                onChange={e =>
-                  updatePlan('plan2', { paternityLeaveWeeks: safeNumber(e.target.value) })
-                }
-                className={inputCls}
-              />
-              <span className="text-[11px] text-gray-500">Separate from the shared pots</span>
-            </div>
-            <div className={fieldCls}>
-              <label className={labelCls}>Starts (weeks after birth)</label>
-              <input
-                type="number"
-                min={0}
-                value={maternity.plan2.startWeekOffset}
-                onChange={e => updatePlan('plan2', { startWeekOffset: safeNumber(e.target.value) })}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          {/* Shared parental leave, with live pot balances */}
-          <div className="bg-teal-50 p-3 rounded-md mb-3">
-            <div className="font-semibold text-sm mb-2">Shared Parental Leave</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Leave weeks</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={maternity.plan2.sharedLeaveWeeksTaken}
-                  onChange={e =>
-                    updatePlan('plan2', { sharedLeaveWeeksTaken: safeNumber(e.target.value) })
-                  }
-                  className={inputCls}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className={fieldCls}>
+                  <label className={labelCls}>Paternity leave (weeks)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2}
+                    value={maternity.plan2.paternityLeaveWeeks}
+                    onChange={e =>
+                      updatePlan('plan2', { paternityLeaveWeeks: safeNumber(e.target.value) })
+                    }
+                    className={inputCls}
+                  />
+                  <span className="text-[11px] text-gray-500">Separate from the shared pots</span>
+                </div>
+                <div className={fieldCls}>
+                  <label className={labelCls}>Starts (weeks after birth)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={maternity.plan2.startWeekOffset}
+                    onChange={e => updatePlan('plan2', { startWeekOffset: safeNumber(e.target.value) })}
+                    className={inputCls}
+                  />
+                </div>
               </div>
-              <div>
-                <label className={labelCls}>Of which paid (ShPP)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={maternity.plan2.sharedPaidWeeksTaken}
-                  onChange={e =>
-                    updatePlan('plan2', { sharedPaidWeeksTaken: safeNumber(e.target.value) })
-                  }
-                  className={inputCls}
-                />
+
+              {/* Shared parental leave, with its own start and live pot balances */}
+              <div className="bg-teal-50 p-3 rounded-md mb-3">
+                <div className="font-semibold text-sm mb-2">Shared Parental Leave</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Leave weeks</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={maternity.plan2.sharedLeaveWeeksTaken}
+                      onChange={e =>
+                        updatePlan('plan2', { sharedLeaveWeeksTaken: safeNumber(e.target.value) })
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Of which paid (ShPP)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={maternity.plan2.sharedPaidWeeksTaken}
+                      onChange={e =>
+                        updatePlan('plan2', { sharedPaidWeeksTaken: safeNumber(e.target.value) })
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className={labelCls}>Shared leave starts (weeks after birth)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={52}
+                    value={maternity.plan2.sharedStartWeekOffset}
+                    onChange={e =>
+                      updatePlan('plan2', { sharedStartWeekOffset: safeNumber(e.target.value) })
+                    }
+                    className={inputCls}
+                  />
+                  <span className="text-[11px] text-gray-500">
+                    Independent of the paternity weeks — take two weeks at the birth and shared
+                    leave months later.
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-600 mt-2 leading-relaxed">
+                  Partner 1 taking {maternity.plan1.maternityLeaveWeeks} weeks releases{' '}
+                  <strong>{pots.leaveAvailable} leave weeks</strong> and{' '}
+                  <strong>{pots.paidAvailable} paid weeks</strong>.
+                  <br />
+                  Used: {results.sharedPots.leaveUsed} of {pots.leaveAvailable} leave ·{' '}
+                  {results.sharedPots.paidUsed} of {pots.paidAvailable} paid. Leave taken beyond
+                  the paid pot is unpaid.
+                </div>
               </div>
-            </div>
-            <div className="text-[11px] text-gray-600 mt-2 leading-relaxed">
-              Partner 1 taking {maternity.plan1.maternityLeaveWeeks} weeks releases{' '}
-              <strong>{pots.leaveAvailable} leave weeks</strong> and{' '}
-              <strong>{pots.paidAvailable} paid weeks</strong>.
-              <br />
-              Used: {results.sharedPots.leaveUsed} of {pots.leaveAvailable} leave ·{' '}
-              {results.sharedPots.paidUsed} of {pots.paidAvailable} paid. Leave taken beyond the
-              paid pot is unpaid.
-            </div>
-          </div>
 
-          <PayBandEditor
-            bands={maternity.plan2.payBands}
-            onChange={bands => updatePlan('plan2', { payBands: bands })}
-          />
+              <PayBandEditor
+                bands={maternity.plan2.payBands}
+                onChange={bands => updatePlan('plan2', { payBands: bands })}
+              />
 
-          <ReturnAndPension
-            plan={maternity.plan2}
-            normalPensionPercent={maternity.partner2EmployeePensionPercentage}
-            onChange={updates => updatePlan('plan2', updates)}
-          />
+              <ReturnAndPension
+                plan={maternity.plan2}
+                profile={parent2}
+                normalPensionPercent={parent2.employeePensionPercentage}
+                onChange={updates => updatePlan('plan2', updates)}
+              />
+            </>
+          )}
         </div>
       </div>
+
 
       {/* ─── Results ─── */}
       <div>
@@ -605,6 +589,42 @@ export function MaternityTab({ maternity, setMaternity, salary, children }: Mate
 
 // ─── Sub-components ───
 
+/** Read-only view of a partner's pay setup, which lives on the Salary tab */
+function ProfileSummary({ profile }: { profile: ParentProfile }) {
+  const rows: [string, string][] = [
+    ['Gross salary', formatCurrency(profile.grossSalary)],
+    [
+      'Pension',
+      `${profile.employeePensionPercentage}% + ${profile.employerPensionPercentage}% employer`,
+    ],
+  ];
+  if (profile.carAllowanceAnnual > 0) {
+    rows.push(['Car allowance', `${formatCurrency(profile.carAllowanceAnnual / 12)}/month`]);
+  }
+  if (profile.hasCompanyCar) {
+    rows.push([
+      'Company car',
+      `${formatCurrency(profile.carSalarySacrificeAnnual / 12)}/month, ${profile.carBIKPercentage}% BIK`,
+    ]);
+  }
+  if (profile.bonusAmount > 0) {
+    rows.push(['Bonus', formatCurrency(profile.bonusAmount)]);
+  }
+  rows.push(['Region', profile.taxRegion === 'scotland' ? 'Scotland' : 'England & Wales']);
+
+  return (
+    <div className="bg-white p-3 rounded-md mb-3 text-sm">
+      {rows.map(([label, value]) => (
+        <div className="flex justify-between mb-1" key={label}>
+          <span className="text-gray-500">{label}</span>
+          <span className="font-medium">{value}</span>
+        </div>
+      ))}
+      <div className="text-[11px] text-gray-500 mt-2">Edit these on the Salary tab.</div>
+    </div>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -768,13 +788,17 @@ function PayBandEditor({
 
 function ReturnAndPension({
   plan,
+  profile,
   normalPensionPercent,
   onChange,
 }: {
   plan: ParentLeavePlan;
+  profile: ParentProfile;
   normalPensionPercent: number;
   onChange: (updates: Partial<ParentLeavePlan>) => void;
 }) {
+  const hasCar = profile.hasCompanyCar;
+  const hasAllowance = profile.carAllowanceAnnual > 0;
   return (
     <>
       <div className={fieldCls}>
@@ -820,6 +844,48 @@ function ReturnAndPension({
           Required through the paid weeks of statutory leave.
         </div>
       </div>
+
+      {(hasCar || hasAllowance) && (
+        <div className="bg-white p-3 rounded-md border border-gray-200 mt-3">
+          <div className="font-semibold text-sm mb-2">Car during leave</div>
+
+          {hasCar && (
+            <>
+              <label className="flex items-center gap-2 text-sm mb-2">
+                <input
+                  type="checkbox"
+                  checked={plan.keepCarDuringLeave}
+                  onChange={e => onChange({ keepCarDuringLeave: e.target.checked })}
+                />
+                <span>Keep the car</span>
+              </label>
+              <div className="text-[11px] text-gray-500 mb-2 -mt-1">
+                The benefit-in-kind stays taxable for as long as you hold it.
+              </div>
+
+              <label className="flex items-center gap-2 text-sm mb-2">
+                <input
+                  type="checkbox"
+                  checked={plan.continueCarSacrificeDuringLeave}
+                  onChange={e => onChange({ continueCarSacrificeDuringLeave: e.target.checked })}
+                />
+                <span>Keep deducting the salary sacrifice</span>
+              </label>
+            </>
+          )}
+
+          {hasAllowance && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={plan.continueCarAllowanceDuringLeave}
+                onChange={e => onChange({ continueCarAllowanceDuringLeave: e.target.checked })}
+              />
+              <span>Keep paying the cash allowance</span>
+            </label>
+          )}
+        </div>
+      )}
     </>
   );
 }

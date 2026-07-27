@@ -33,6 +33,9 @@ uk-tax-calculator/
 │   │   │   ├── pension.ts       # Pension contributions & projections
 │   │   │   ├── benefits.ts      # Child benefit, Tax-Free Childcare, ANI
 │   │   │   ├── maternityPay.ts  # Parental leave: weekly schedule -> tax years
+│   ├── components/
+│   │   ├── PersonInputs.tsx     # One person's pay setup, shared by both partners
+│   │   └── CollapsibleSection.tsx
 │   │   │   ├── companyCard.ts   # BIK calculations
 │   │   │   ├── housePurchase.ts # House affordability analysis
 │   │   │   ├── lbtt.ts          # Scottish property tax
@@ -78,6 +81,10 @@ The Maternity & Paternity tab (`src/lib/calculator/maternityPay.ts`) models a co
 leave a week at a time from the birth date, then aggregates into PAYE tax months and tax
 years. Three things drive the design:
 
+- **Leave is a set of blocks, not one span.** Each block carries its own start
+  week: the birth parent's maternity block, and for the partner a paternity
+  block and a Shared Parental Leave block that can start months apart. Weeks
+  between blocks are working weeks.
 - **Leave and pay are separate pots.** Maternity leave runs to 52 weeks but only 39 are
   paid. Curtailing it releases up to 50 shared leave weeks and up to 37 shared pay weeks
   (the birth parent cannot give up 2 compulsory weeks of either). Shared Parental Leave
@@ -93,8 +100,17 @@ years. Three things drive the design:
   usually the most interesting result on the tab.
 
 Employer schemes are inclusive of statutory pay: each week pays the higher of the two
-rather than stacking. Salary is spread over the actual length of each tax year, so a full
-working year sums to exactly the annual salary in leap years too.
+rather than stacking.
+
+Salary is **levelled**: payroll pays annual/12 every month whatever its length, so weekly
+pay carries a salary factor (a proportion of normal pay) separately from a statutory cash
+amount. Only genuinely weekly statutory pay varies with month length.
+
+Both partners' pay and tax details come from the Salary tab, including company car,
+benefit-in-kind, cash car allowance and bonus. The Maternity tab only decides who takes
+what leave and when, plus what happens to the car during it: whether it is kept (so the
+benefit-in-kind stays taxable), whether the sacrifice keeps being deducted, and whether
+the cash allowance keeps being paid.
 
 ### Scenario Comparison
 The app supports comparing two scenarios (A and B) with different:

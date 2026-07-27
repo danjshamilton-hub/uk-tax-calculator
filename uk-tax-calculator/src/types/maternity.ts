@@ -35,6 +35,19 @@ export interface ParentProfile {
   hasPostgradLoan: boolean;
   currentAge: number;
   retirementAge: number;
+
+  // Annual bonus, spread evenly across the tax year
+  bonusAmount: number;
+  bonusSacrificePercentage: number;
+
+  // Company car (salary sacrifice) and cash car allowance
+  hasCompanyCar: boolean;
+  /** Annual salary sacrifice for the car */
+  carSalarySacrificeAnnual: number;
+  carP11DValue: number;
+  carBIKPercentage: number;
+  /** Annual cash allowance, paid with salary */
+  carAllowanceAnnual: number;
 }
 
 /** The leave a parent plans to take */
@@ -52,8 +65,18 @@ export interface ParentLeavePlan {
   /** Partner only: how many of those SPL weeks are paid as ShPP, from the shared pay pot */
   sharedPaidWeeksTaken: number;
 
-  /** Weeks relative to the birth week. Negative starts leave before the birth. */
+  /**
+   * Start of the maternity or paternity block, in weeks relative to the birth
+   * week. Negative starts leave before the birth.
+   */
   startWeekOffset: number;
+
+  /**
+   * Start of the Shared Parental Leave block, independent of the paternity
+   * block. Partners typically take two weeks at the birth and their shared
+   * leave months later, so the two need not run back to back.
+   */
+  sharedStartWeekOffset: number;
 
   /** Employer's own scheme, applied across the leave in order */
   payBands: LeavePayBand[];
@@ -65,6 +88,14 @@ export interface ParentLeavePlan {
   employeePensionPercentDuringLeave: number;
   /** Employer keeps contributing on pre-leave salary through the paid weeks */
   employerMaintainsPension: boolean;
+
+  // What happens to the car and allowance while on leave
+  /** Keep the company car, so the benefit-in-kind stays taxable all year */
+  keepCarDuringLeave: boolean;
+  /** Keep deducting the car salary sacrifice during leave */
+  continueCarSacrificeDuringLeave: boolean;
+  /** Keep paying the cash car allowance during leave */
+  continueCarAllowanceDuringLeave: boolean;
 }
 
 export interface MaternityInputs {
@@ -108,6 +139,11 @@ export interface WeeklyPay {
   employerPensionRate: number;
   /** Employer contributes on pre-leave salary rather than actual pay */
   employerOnPreLeaveSalary: boolean;
+
+  /** Proportion of the normal cash car allowance paid this week */
+  carAllowanceFactor: number;
+  /** Proportion of the normal car salary sacrifice deducted this week */
+  carSacrificeFactor: number;
 }
 
 export interface ParentMonthRow {

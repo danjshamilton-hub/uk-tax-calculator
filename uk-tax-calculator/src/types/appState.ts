@@ -93,15 +93,8 @@ export interface Partner2State extends PersonalDetails {
 /** Maternity & paternity tab state */
 export interface MaternityState {
   birthDate: string; // ISO yyyy-mm-dd
-
-  // Partner 2's own details (Partner 1 comes from the Salary tab)
-  partner2GrossSalary: number;
-  partner2TaxRegion: TaxRegion;
-  partner2EmployeePensionPercentage: number;
-  partner2EmployerPensionPercentage: number;
-  partner2StudentLoanPlan: StudentLoanPlan;
-  partner2HasPostgradLoan: boolean;
-
+  // Both partners' pay and tax details come from the Salary tab; this tab only
+  // decides who takes what leave, when.
   plan1: ParentLeavePlan;
   plan2: ParentLeavePlan;
 }
@@ -185,13 +178,6 @@ export const DEFAULT_MATERNITY: MaternityState = {
   // Default to a birth early in the next tax year
   birthDate: '2026-09-01',
 
-  partner2GrossSalary: 40000,
-  partner2TaxRegion: 'scotland',
-  partner2EmployeePensionPercentage: 5,
-  partner2EmployerPensionPercentage: 3,
-  partner2StudentLoanPlan: 'none',
-  partner2HasPostgradLoan: false,
-
   plan1: {
     role: 'birthParent',
     maternityLeaveWeeks: 39,
@@ -199,6 +185,7 @@ export const DEFAULT_MATERNITY: MaternityState = {
     sharedLeaveWeeksTaken: 0,
     sharedPaidWeeksTaken: 0,
     startWeekOffset: 0,
+    sharedStartWeekOffset: 0,
     // A common UK occupational scheme: 3 months full pay, 3 months half pay,
     // then statutory for the rest of the paid period
     payBands: [
@@ -209,6 +196,9 @@ export const DEFAULT_MATERNITY: MaternityState = {
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
+    keepCarDuringLeave: true,
+    continueCarSacrificeDuringLeave: true,
+    continueCarAllowanceDuringLeave: false,
   },
 
   plan2: {
@@ -218,10 +208,15 @@ export const DEFAULT_MATERNITY: MaternityState = {
     sharedLeaveWeeksTaken: 0,
     sharedPaidWeeksTaken: 0,
     startWeekOffset: 0,
+    // Shared leave usually starts once the birth parent's leave is winding down
+    sharedStartWeekOffset: 26,
     payBands: [{ weeks: 2, mode: 'fullPay' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
+    keepCarDuringLeave: true,
+    continueCarSacrificeDuringLeave: true,
+    continueCarAllowanceDuringLeave: false,
   },
 };
 

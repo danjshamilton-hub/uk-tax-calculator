@@ -109,24 +109,69 @@ export function getTaxMonths(taxYear: number): TaxMonth[] {
 
 // ─── Leave schedule ───
 
-interface LeaveWindow {
+type LeaveKind = 'maternity' | 'paternity' | 'shared';
+
+interface LeaveBlock {
+  kind: LeaveKind;
   startWeek: number;
+  weeks: number;
   endWeek: number; // exclusive
+}
+
+interface LeaveWindow {
+  blocks: LeaveBlock[];
+  startWeek: number;
+  endWeek: number; // exclusive, the end of the last block
   totalWeeks: number;
 }
 
-/** The weeks a parent is away from work, relative to the birth week */
+/**
+ * The weeks a parent is away from work, as separate blocks relative to the
+ * birth week. A partner typically takes two weeks of paternity leave at the
+ * birth and their shared parental leave months later, so the blocks each carry
+ * their own start and need not run back to back.
+ */
 function getLeaveWindow(plan: ParentLeavePlan): LeaveWindow {
-  const totalWeeks =
-    plan.role === 'birthParent'
-      ? Math.max(0, plan.maternityLeaveWeeks)
-      : Math.max(0, plan.paternityLeaveWeeks) + Math.max(0, plan.sharedLeaveWeeksTaken);
+  const blocks: LeaveBlock[] = [];
+
+  const add = (kind: LeaveKind, startWeek: number, weeks: number) => {
+    if (weeks > 0) blocks.push({ kind, startWeek, weeks, endWeek: startWeek + weeks });
+  };
+
+  if (plan.role === 'birthParent') {
+    add('maternity', plan.startWeekOffset, Math.max(0, plan.maternityLeaveWeeks));
+  } else {
+    add('paternity', plan.startWeekOffset, Math.max(0, plan.paternityLeaveWeeks));
+    add('shared', plan.sharedStartWeekOffset, Math.max(0, plan.sharedLeaveWeeksTaken));
+  }
+
+  blocks.sort((a, b) => a.startWeek - b.startWeek);
+  const totalWeeks = blocks.reduce((sum, b) => sum + b.weeks, 0);
 
   return {
-    startWeek: plan.startWeekOffset,
-    endWeek: plan.startWeekOffset + totalWeeks,
+    blocks,
+    startWeek: blocks.length ? blocks[0].startWeek : plan.startWeekOffset,
+    endWeek: blocks.length ? Math.max(...blocks.map(b => b.endWeek)) : plan.startWeekOffset,
     totalWeeks,
   };
+}
+
+/** The block a week falls in, and how far into that parent's leave it is */
+function findLeaveWeek(
+  window: LeaveWindow,
+  weekIndex: number
+): { block: LeaveBlock; indexInBlock: number; cumulativeLeaveWeek: number } | null {
+  let consumed = 0;
+
+  for (const block of window.blocks) {
+    if (weekIndex >= block.startWeek && weekIndex < block.endWeek) {
+      const indexInBlock = weekIndex - block.startWeek;
+      return { block, indexInBlock, cumulativeLeaveWeek: consumed + indexInBlock };
+    }
+    consumed += block.weeks;
+  }
+
+  return null;
 }
 
 /**
@@ -201,20 +246,21 @@ function occupationalPay(
 /** Statutory entitlement for a given week of leave, with a label */
 function statutoryPayForWeek(
   ctx: WeeklyContext,
-  leaveWeekIndex: number,
+  block: LeaveBlock,
+  indexInBlock: number,
   weekIndex: number
 ): { amount: number; label: string; status: WeekStatus } {
   const weeklySalary = ctx.profile.grossSalary / 52;
   const ninetyPercent = weeklySalary * 0.9;
   const flatRate = ctx.statutoryRateForWeek(weekIndex);
-  const { maternity, paternity } = getStatutoryPay(ctx.weekTaxYear(weekIndex));
+  const { maternity } = getStatutoryPay(ctx.weekTaxYear(weekIndex));
 
-  if (ctx.plan.role === 'birthParent') {
-    if (leaveWeekIndex < maternity.higherRateWeeks) {
+  if (block.kind === 'maternity') {
+    if (indexInBlock < maternity.higherRateWeeks) {
       // First 6 weeks at 90% of average weekly earnings, uncapped
       return { amount: ninetyPercent, label: 'SMP 90%', status: 'maternity' };
     }
-    if (leaveWeekIndex < maternity.maxPaidWeeks) {
+    if (indexInBlock < maternity.maxPaidWeeks) {
       return {
         amount: Math.min(flatRate, ninetyPercent),
         label: 'SMP',
@@ -225,13 +271,7 @@ function statutoryPayForWeek(
     return { amount: 0, label: 'Unpaid', status: 'unpaid' };
   }
 
-  // Partner: statutory paternity leave first, then any Shared Parental Leave
-  const paternityWeeks = Math.min(
-    Math.max(0, ctx.plan.paternityLeaveWeeks),
-    paternity.leaveWeeks
-  );
-
-  if (leaveWeekIndex < paternityWeeks) {
+  if (block.kind === 'paternity') {
     return {
       amount: Math.min(flatRate, ninetyPercent),
       label: 'Paternity',
@@ -239,8 +279,8 @@ function statutoryPayForWeek(
     };
   }
 
-  const splWeekIndex = leaveWeekIndex - paternityWeeks;
-  if (splWeekIndex < ctx.fundedSharedWeeks) {
+  // Shared Parental Leave: paid only as far as the shared pay pot reaches
+  if (indexInBlock < ctx.fundedSharedWeeks) {
     return {
       amount: Math.min(flatRate, ninetyPercent),
       label: 'ShPP',
@@ -248,7 +288,6 @@ function statutoryPayForWeek(
     };
   }
 
-  // Shared Parental Leave beyond the shared pay pot is unpaid
   return { amount: 0, label: 'SPL (unpaid)', status: 'unpaid' };
 }
 
@@ -262,10 +301,9 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
   const weeklySalary = profile.grossSalary / 52;
 
   return (weekIndex: number): WeeklyPay => {
-    const onLeave =
-      !ctx.baseline && window.totalWeeks > 0 && weekIndex >= window.startWeek && weekIndex < window.endWeek;
+    const leaveWeek = ctx.baseline ? null : findLeaveWeek(window, weekIndex);
 
-    if (!onLeave) {
+    if (!leaveWeek) {
       // Working. After the leave ends, salary may be reduced (part-time return).
       const returnedToWork = !ctx.baseline && window.totalWeeks > 0 && weekIndex >= window.endWeek;
       const salaryFactor = returnedToWork ? plan.returnSalaryPercent / 100 : 1;
@@ -284,21 +322,22 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
         employeePensionRate: profile.employeePensionPercentage,
         employerPensionRate: profile.employerPensionPercentage,
         employerOnPreLeaveSalary: false,
+        carAllowanceFactor: 1,
+        carSacrificeFactor: 1,
       };
     }
 
-    const leaveWeekIndex = weekIndex - window.startWeek;
-    const statutory = statutoryPayForWeek(ctx, leaveWeekIndex, weekIndex);
-    const occupational = occupationalPay(ctx, leaveWeekIndex, weeklySalary);
+    const { block, indexInBlock, cumulativeLeaveWeek } = leaveWeek;
+    const statutory = statutoryPayForWeek(ctx, block, indexInBlock, weekIndex);
+    const occupational = occupationalPay(ctx, cumulativeLeaveWeek, weeklySalary);
 
     // Employer schemes are inclusive of statutory pay: the employer tops up to
     // the enhanced rate rather than paying it on top.
     const usesOccupational = occupational.amount > statutory.amount;
     const gross = Math.max(statutory.amount, occupational.amount);
     const payLabel = usesOccupational ? occupational.label : statutory.label;
-    const status: WeekStatus = gross > 0 && statutory.status === 'unpaid'
-      ? (plan.role === 'birthParent' ? 'maternity' : 'shared')
-      : statutory.status;
+    const status: WeekStatus =
+      gross > 0 && statutory.status === 'unpaid' ? block.kind : statutory.status;
 
     // Occupational pay is a share of normal salary and is levelled by payroll
     // like any other salary; statutory pay is a fixed weekly cash amount.
@@ -332,6 +371,11 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
       employeePensionRate,
       employerPensionRate: profile.employerPensionPercentage,
       employerOnPreLeaveSalary,
+      // A cash car allowance normally stops with salary; a car salary sacrifice
+      // normally keeps being deducted while you keep the car. Both are policy,
+      // so both are settable.
+      carAllowanceFactor: plan.continueCarAllowanceDuringLeave ? 1 : 0,
+      carSacrificeFactor: plan.continueCarSacrificeDuringLeave ? 1 : 0,
     };
   };
 }
@@ -339,12 +383,17 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
 // ─── Monthly aggregation ───
 
 interface MonthTotals {
+  /** Salary, statutory pay and cash car allowance, before any sacrifice */
   gross: number;
   employeePension: number;
   employerPension: number;
+  /** Car salary sacrifice deducted this month */
+  carSacrifice: number;
   status: WeekStatus;
   payLabel: string;
   leaveDays: number;
+  /** Proportion of the month the company car was held, for the BIK charge */
+  carHeldFraction: number;
 }
 
 /**
@@ -360,11 +409,14 @@ function aggregateMonth(
   month: TaxMonth,
   birthDate: Date,
   weeklyPay: (weekIndex: number) => WeeklyPay,
-  annualSalary: number
+  profile: ParentProfile,
+  keepCarDuringLeave: boolean
 ): MonthTotals {
   let gross = 0;
   let employeePension = 0;
   let employerPension = 0;
+  let carSacrifice = 0;
+  let carHeldDays = 0;
   let leaveDays = 0;
 
   const statusDays = new Map<WeekStatus, number>();
@@ -372,22 +424,35 @@ function aggregateMonth(
 
   const daysInMonth =
     Math.round((month.end.getTime() - month.start.getTime()) / MS_PER_DAY) + 1;
-  const salaryPerDay = annualSalary / 12 / daysInMonth;
+  const salaryPerDay = profile.grossSalary / 12 / daysInMonth;
+  const allowancePerDay = profile.carAllowanceAnnual / 12 / daysInMonth;
+  const sacrificePerDay = profile.hasCompanyCar
+    ? profile.carSalarySacrificeAnnual / 12 / daysInMonth
+    : 0;
 
   for (let t = month.start.getTime(); t <= month.end.getTime(); t += MS_PER_DAY) {
     const weekIndex = Math.floor((t - birthDate.getTime()) / MS_PER_WEEK);
     const week = weeklyPay(weekIndex);
+    const onLeave = week.status !== 'working';
 
-    const dayPay = week.salaryFactor * salaryPerDay + week.statutoryWeekly / 7;
+    // A cash car allowance is pay, so it counts towards gross
+    const dayPay =
+      week.salaryFactor * salaryPerDay +
+      week.statutoryWeekly / 7 +
+      week.carAllowanceFactor * allowancePerDay;
     const employerBase = week.employerOnPreLeaveSalary ? salaryPerDay : dayPay;
 
     gross += dayPay;
     employeePension += dayPay * (week.employeePensionRate / 100);
     employerPension += employerBase * (week.employerPensionRate / 100);
+    carSacrifice += week.carSacrificeFactor * sacrificePerDay;
+
+    // The benefit-in-kind is charged for as long as the car is held
+    if (profile.hasCompanyCar && (!onLeave || keepCarDuringLeave)) carHeldDays++;
 
     statusDays.set(week.status, (statusDays.get(week.status) ?? 0) + 1);
     labelDays.set(week.payLabel, (labelDays.get(week.payLabel) ?? 0) + 1);
-    if (week.status !== 'working') leaveDays++;
+    if (onLeave) leaveDays++;
   }
 
   const dominant = <T,>(counts: Map<T, number>, fallback: T): T => {
@@ -406,9 +471,11 @@ function aggregateMonth(
     gross,
     employeePension,
     employerPension,
+    carSacrifice,
     status: dominant(statusDays, 'working'),
     payLabel: dominant(labelDays, 'Full pay'),
     leaveDays,
+    carHeldFraction: carHeldDays / daysInMonth,
   };
 }
 
@@ -430,21 +497,33 @@ function computeParentYear(
   profile: ParentProfile,
   taxYear: number,
   birthDate: Date,
-  weeklyPay: (weekIndex: number) => WeeklyPay
+  weeklyPay: (weekIndex: number) => WeeklyPay,
+  keepCarDuringLeave: boolean
 ): ParentYearComputation {
   const months = getTaxMonths(taxYear).map((month) => ({
     month,
-    totals: aggregateMonth(month, birthDate, weeklyPay, profile.grossSalary),
+    totals: aggregateMonth(month, birthDate, weeklyPay, profile, keepCarDuringLeave),
   }));
 
-  const annualGross = months.reduce((sum, m) => sum + m.totals.gross, 0);
+  // A bonus is paid regardless of leave, so it sits in both the plan and the
+  // baseline; it matters here because it moves both into higher tax bands.
+  const bonusPerMonth = profile.bonusAmount / 12;
+
+  const annualGross =
+    months.reduce((sum, m) => sum + m.totals.gross, 0) + profile.bonusAmount;
   const annualEmployeePension = months.reduce((sum, m) => sum + m.totals.employeePension, 0);
   const annualEmployerPension = months.reduce((sum, m) => sum + m.totals.employerPension, 0);
+  const annualCarSacrifice = months.reduce((sum, m) => sum + m.totals.carSacrifice, 0);
+  const carProRataFactor =
+    months.reduce((sum, m) => sum + m.totals.carHeldFraction, 0) / 12;
 
   // NI and student loan are assessed per pay period, so they are summed month by
   // month rather than derived from the annual total.
   const monthlyDeductions = months.map(({ totals }) => {
-    const niablePay = Math.max(0, totals.gross - totals.employeePension);
+    const niablePay = Math.max(
+      0,
+      totals.gross + bonusPerMonth - totals.employeePension - totals.carSacrifice
+    );
     return {
       nationalInsurance: calculateNIForPeriod(niablePay, 12, taxYear),
       studentLoan:
@@ -457,7 +536,9 @@ function computeParentYear(
   const annualStudentLoan = monthlyDeductions.reduce((sum, m) => sum + m.studentLoan, 0);
 
   // Express the year's actual pension contributions as a percentage so the
-  // existing engine reproduces the right pound amounts.
+  // existing engine reproduces the right pound amounts. The bonus is folded into
+  // gross here rather than passed separately, because its own sacrifice is
+  // already accounted for in the pension totals.
   const pensionPercent = annualGross > 0 ? (annualEmployeePension / annualGross) * 100 : 0;
   const employerPercent = annualGross > 0 ? (annualEmployerPension / annualGross) * 100 : 0;
 
@@ -470,10 +551,11 @@ function computeParentYear(
     employerPensionPercentage: employerPercent,
     bonusAmount: 0,
     bonusSacrificePercentage: 0,
-    hasCompanyCar: false,
-    carSalarySacrifice: 0,
-    carP11DValue: 0,
-    carBIKPercentage: 0,
+    hasCompanyCar: profile.hasCompanyCar,
+    carSalarySacrifice: annualCarSacrifice,
+    carP11DValue: profile.carP11DValue,
+    carBIKPercentage: profile.carBIKPercentage,
+    carBIKProRataFactor: carProRataFactor,
     currentAge: profile.currentAge,
     retirementAge: profile.retirementAge,
     studentLoanPlan: profile.studentLoanPlan,
@@ -499,7 +581,10 @@ function computeParentYear(
   let taxPaidToDate = 0;
 
   const monthDetails = months.map(({ month, totals }, i) => {
-    const taxablePay = Math.max(0, totals.gross - totals.employeePension);
+    const taxablePay = Math.max(
+      0,
+      totals.gross + bonusPerMonth - totals.employeePension - totals.carSacrifice
+    );
     cumulativeTaxablePay += taxablePay;
 
     const periodsElapsed = i + 1;
@@ -579,11 +664,16 @@ export function getWeeklySchedule(inputs: MaternityInputs, parent: 1 | 2): Weekl
     sharedLeaveWeeksTaken: sharedLeaveUsed,
   });
 
+  // Only the weeks actually spent on leave. Blocks can be far apart — two weeks
+  // of paternity at the birth and shared leave months later — so the weeks in
+  // between are working weeks and are not part of the schedule.
   const schedule: WeeklyPay[] = [];
-  for (let w = window.startWeek; w < window.endWeek; w++) {
-    schedule.push(weeklyPay(w));
+  for (const block of window.blocks) {
+    for (let w = block.startWeek; w < block.endWeek; w++) {
+      if (findLeaveWeek(window, w)?.block === block) schedule.push(weeklyPay(w));
+    }
   }
-  return schedule;
+  return schedule.sort((a, b) => a.weekIndex - b.weekIndex);
 }
 
 export function calculateMaternityResults(inputs: MaternityInputs): MaternityResults {
@@ -614,6 +704,21 @@ export function calculateMaternityResults(inputs: MaternityInputs): MaternityRes
   }
   if (requestedSharedPaid > sharedLeaveUsed) {
     warnings.push('Shared Parental Pay weeks cannot exceed the Shared Parental Leave weeks taken.');
+  }
+
+  // Paternity and shared leave are separate blocks; overlapping them would count
+  // the same weeks twice, so the overlap is dropped and flagged.
+  const paternityEnd = inputs.plan2.startWeekOffset + Math.max(0, inputs.plan2.paternityLeaveWeeks);
+  if (
+    inputs.plan2.paternityLeaveWeeks > 0 &&
+    sharedLeaveUsed > 0 &&
+    inputs.plan2.sharedStartWeekOffset < paternityEnd
+  ) {
+    warnings.push(
+      `${inputs.parent2.label}'s shared parental leave starts before their paternity leave ` +
+        `ends (week ${paternityEnd}). The overlapping weeks are only counted once — start the ` +
+        'shared block later to take them all.'
+    );
   }
 
   const plan1: ParentLeavePlan = { ...inputs.plan1, role: 'birthParent' };
@@ -689,10 +794,11 @@ export function calculateMaternityResults(inputs: MaternityInputs): MaternityRes
   for (const taxYear of affectedYears) {
     const rates = getRatesForTaxYear(taxYear);
 
-    const p1 = computeParentYear(inputs.parent1, taxYear, birthDate, pay1);
-    const p2 = computeParentYear(inputs.parent2, taxYear, birthDate, pay2);
-    const b1 = computeParentYear(inputs.parent1, taxYear, birthDate, base1);
-    const b2 = computeParentYear(inputs.parent2, taxYear, birthDate, base2);
+    const p1 = computeParentYear(inputs.parent1, taxYear, birthDate, pay1, plan1.keepCarDuringLeave);
+    const p2 = computeParentYear(inputs.parent2, taxYear, birthDate, pay2, plan2.keepCarDuringLeave);
+    // The baseline is a normal working year, so the car is always held
+    const b1 = computeParentYear(inputs.parent1, taxYear, birthDate, base1, true);
+    const b2 = computeParentYear(inputs.parent2, taxYear, birthDate, base2, true);
 
     const benefits = householdBenefits(
       inputs,

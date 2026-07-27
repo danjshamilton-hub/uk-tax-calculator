@@ -23,6 +23,13 @@ function profile(overrides: Partial<ParentProfile> = {}): ParentProfile {
     hasPostgradLoan: false,
     currentAge: 35,
     retirementAge: 65,
+    bonusAmount: 0,
+    bonusSacrificePercentage: 0,
+    hasCompanyCar: false,
+    carSalarySacrificeAnnual: 0,
+    carP11DValue: 0,
+    carBIKPercentage: 0,
+    carAllowanceAnnual: 0,
     ...overrides,
   };
 }
@@ -35,10 +42,14 @@ function birthPlan(overrides: Partial<ParentLeavePlan> = {}): ParentLeavePlan {
     sharedLeaveWeeksTaken: 0,
     sharedPaidWeeksTaken: 0,
     startWeekOffset: 0,
+    sharedStartWeekOffset: 0,
     payBands: [{ weeks: 52, mode: 'statutory' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
+    keepCarDuringLeave: true,
+    continueCarSacrificeDuringLeave: true,
+    continueCarAllowanceDuringLeave: false,
     ...overrides,
   };
 }
@@ -51,10 +62,15 @@ function partnerPlan(overrides: Partial<ParentLeavePlan> = {}): ParentLeavePlan 
     sharedLeaveWeeksTaken: 0,
     sharedPaidWeeksTaken: 0,
     startWeekOffset: 0,
+    // Shared leave starts once the paternity block ends
+    sharedStartWeekOffset: 2,
     payBands: [{ weeks: 52, mode: 'statutory' }],
     returnSalaryPercent: 100,
     employeePensionPercentDuringLeave: 5,
     employerMaintainsPension: true,
+    keepCarDuringLeave: true,
+    continueCarSacrificeDuringLeave: true,
+    continueCarAllowanceDuringLeave: false,
     ...overrides,
   };
 }
@@ -247,6 +263,151 @@ describe('shared parental leave and pay pots', () => {
     for (const week of schedule) {
       expect(week.gross).toBeCloseTo(RATE_2026, 2);
     }
+  });
+});
+
+describe('separate leave blocks', () => {
+  it('lets shared parental leave start long after the paternity block', () => {
+    const schedule = getWeeklySchedule(
+      inputs({
+        plan1: birthPlan({ maternityLeaveWeeks: 26 }),
+        plan2: partnerPlan({
+          paternityLeaveWeeks: 2,
+          startWeekOffset: 0,
+          sharedLeaveWeeksTaken: 10,
+          sharedPaidWeeksTaken: 10,
+          sharedStartWeekOffset: 26,
+        }),
+      }),
+      2
+    );
+
+    // Two weeks at the birth, then a gap, then ten weeks from week 26
+    expect(schedule.filter((w) => w.payLabel === 'Paternity')).toHaveLength(2);
+    expect(schedule.filter((w) => w.payLabel === 'ShPP')).toHaveLength(10);
+    expect(schedule.map((w) => w.weekIndex).slice(0, 2)).toEqual([0, 1]);
+    expect(schedule.map((w) => w.weekIndex).slice(2, 4)).toEqual([26, 27]);
+  });
+
+  it('keeps the partner at work in the gap between blocks', () => {
+    const result = calculateMaternityResults(
+      inputs({
+        birthDate: '2026-04-20',
+        plan1: birthPlan({ maternityLeaveWeeks: 26 }),
+        plan2: partnerPlan({
+          paternityLeaveWeeks: 2,
+          sharedLeaveWeeksTaken: 10,
+          sharedPaidWeeksTaken: 10,
+          sharedStartWeekOffset: 26,
+        }),
+      })
+    );
+
+    const statuses = result.monthlyCashflow.map((m) => m.parent2.status);
+    // Working months appear between the paternity month and the shared months
+    expect(statuses).toContain('working');
+    expect(statuses).toContain('shared');
+  });
+
+  it('warns when the shared block overlaps the paternity block', () => {
+    const result = calculateMaternityResults(
+      inputs({
+        plan1: birthPlan({ maternityLeaveWeeks: 26 }),
+        plan2: partnerPlan({
+          paternityLeaveWeeks: 2,
+          sharedLeaveWeeksTaken: 10,
+          sharedPaidWeeksTaken: 10,
+          sharedStartWeekOffset: 0,
+        }),
+      })
+    );
+    expect(result.warnings.some((w) => w.includes('starts before their paternity leave'))).toBe(true);
+  });
+});
+
+describe('car, allowance and bonus', () => {
+  it('counts a cash car allowance as pay when it continues through leave', () => {
+    const withAllowance = calculateMaternityResults(
+      inputs({
+        parent1: profile({ carAllowanceAnnual: 6000 }),
+        plan1: birthPlan({ continueCarAllowanceDuringLeave: true }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+    const stopped = calculateMaternityResults(
+      inputs({
+        parent1: profile({ carAllowanceAnnual: 6000 }),
+        plan1: birthPlan({ continueCarAllowanceDuringLeave: false }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+
+    expect(withAllowance.taxYears[0].parent1.grossPay).toBeGreaterThan(
+      stopped.taxYears[0].parent1.grossPay
+    );
+    // Stopping it for 39 weeks costs roughly three quarters of the annual amount
+    const gap =
+      withAllowance.taxYears[0].parent1.grossPay - stopped.taxYears[0].parent1.grossPay;
+    expect(gap).toBeGreaterThan(3500);
+    expect(gap).toBeLessThan(5000);
+  });
+
+  it('keeps the benefit-in-kind taxable while the car is held', () => {
+    const kept = calculateMaternityResults(
+      inputs({
+        parent1: profile({ hasCompanyCar: true, carP11DValue: 40000, carBIKPercentage: 20 }),
+        plan1: birthPlan({ keepCarDuringLeave: true }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+    const given_back = calculateMaternityResults(
+      inputs({
+        parent1: profile({ hasCompanyCar: true, carP11DValue: 40000, carBIKPercentage: 20 }),
+        plan1: birthPlan({ keepCarDuringLeave: false }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+
+    // Keeping the car keeps £8,000 of BIK in charge, so ANI and tax are higher
+    expect(kept.taxYears[0].parent1.adjustedNetIncome).toBeGreaterThan(
+      given_back.taxYears[0].parent1.adjustedNetIncome
+    );
+    expect(kept.taxYears[0].parent1.incomeTax).toBeGreaterThan(
+      given_back.taxYears[0].parent1.incomeTax
+    );
+  });
+
+  it('stops the car sacrifice when told to', () => {
+    const continued = calculateMaternityResults(
+      inputs({
+        parent1: profile({ hasCompanyCar: true, carSalarySacrificeAnnual: 6000 }),
+        plan1: birthPlan({ continueCarSacrificeDuringLeave: true }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+    const paused = calculateMaternityResults(
+      inputs({
+        parent1: profile({ hasCompanyCar: true, carSalarySacrificeAnnual: 6000 }),
+        plan1: birthPlan({ continueCarSacrificeDuringLeave: false }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+
+    // Pausing the sacrifice leaves more take-home, so the leave costs less
+    expect(paused.netDrop).toBeLessThan(continued.netDrop);
+  });
+
+  it('includes a bonus in both the plan and the baseline', () => {
+    const withBonus = calculateMaternityResults(
+      inputs({
+        parent1: profile({ bonusAmount: 10000 }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+
+    // The bonus lifts gross in both, so it must not show up as a drop
+    expect(withBonus.baseline.grossTotal).toBeGreaterThan(52000 + 52000);
+    expect(withBonus.taxYears[0].parent1Baseline.grossPay).toBeCloseTo(62000, 0);
   });
 });
 

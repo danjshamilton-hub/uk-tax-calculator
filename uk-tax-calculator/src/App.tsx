@@ -331,6 +331,9 @@ function App() {
           maternity={maternity}
           setMaternity={setMaternity}
           salary={salary}
+          companyCar={companyCar}
+          bonus={bonus}
+          partner2={partner2}
           children={children}
         />
       )}
