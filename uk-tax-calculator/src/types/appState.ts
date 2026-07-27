@@ -65,6 +65,31 @@ export interface HouseState {
   mortgageMaxOverride: number;
 }
 
+/** Details belonging to a person rather than a scenario */
+export interface PersonalDetails {
+  taxRegion: TaxRegion;
+  currentAge: number;
+  retirementAge: number;
+  studentLoanPlan?: StudentLoanPlan;
+  hasPostgradLoan?: boolean;
+}
+
+/**
+ * Partner 2's full profile, mirroring the fields Partner 1 gets from
+ * SalaryState + CompanyCarState + BonusState + ScenarioBState. Kept in its own
+ * state key so Partner 1's saved data is untouched.
+ */
+export interface Partner2State extends PersonalDetails {
+  /** Whether the household has a second earner at all */
+  enabled: boolean;
+  grossSalary: number;
+  employeePensionPercentage: number;
+  employerPensionPercentage: number;
+  companyCar: CompanyCarState;
+  bonus: BonusState;
+  scenarioB: ScenarioBState;
+}
+
 /** Maternity & paternity tab state */
 export interface MaternityState {
   birthDate: string; // ISO yyyy-mm-dd
@@ -133,6 +158,27 @@ export const DEFAULT_SCENARIO_B: ScenarioBState = {
   employerPensionPercentage: undefined,
   companyCar: { ...DEFAULT_COMPANY_CAR },
   bonus: { ...DEFAULT_BONUS },
+};
+
+export const DEFAULT_PARTNER2: Partner2State = {
+  enabled: false,
+  grossSalary: 40000,
+  taxRegion: 'scotland',
+  employeePensionPercentage: 5,
+  employerPensionPercentage: 3,
+  currentAge: 35,
+  retirementAge: 65,
+  studentLoanPlan: 'none',
+  hasPostgradLoan: false,
+  companyCar: { ...DEFAULT_COMPANY_CAR },
+  bonus: { ...DEFAULT_BONUS },
+  scenarioB: {
+    grossSalary: 40000,
+    employeePensionPercentage: 10,
+    employerPensionPercentage: undefined,
+    companyCar: { ...DEFAULT_COMPANY_CAR },
+    bonus: { ...DEFAULT_BONUS },
+  },
 };
 
 export const DEFAULT_MATERNITY: MaternityState = {

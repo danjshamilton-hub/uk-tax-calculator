@@ -12,8 +12,9 @@ import type {
   HouseState,
   BudgetState,
   MaternityState,
+  Partner2State,
 } from './types/appState';
-import { DEFAULT_MATERNITY } from './types/appState';
+import { DEFAULT_MATERNITY, DEFAULT_PARTNER2 } from './types/appState';
 import { constants } from './data/constants';
 import { usePersistedState } from './hooks/usePersistedState';
 
@@ -81,6 +82,8 @@ function App() {
     useGrossForMortgage: false,
     mortgageMaxOverride: 0,
   });
+
+  const [partner2, setPartner2] = usePersistedState<Partner2State>('app:partner2', DEFAULT_PARTNER2);
 
   const [maternity, setMaternity] = usePersistedState<MaternityState>('app:maternity', DEFAULT_MATERNITY);
 
@@ -152,7 +155,35 @@ function App() {
     claimsChildBenefit: children.claimsChildBenefitB,
   }), [inputsA, scenarioB, children.claimsChildBenefitB, salary.employerPensionPercentage]);
 
+  const inputsPartner2: ScenarioInputs = useMemo(() => ({
+    name: 'Partner 2',
+    taxRegion: partner2.taxRegion,
+    grossSalary: partner2.grossSalary,
+    employeePensionPercentage: partner2.employeePensionPercentage,
+    employerPensionPercentage: partner2.employerPensionPercentage,
+    bonusAmount: partner2.bonus.bonusAmount,
+    bonusSacrificePercentage: partner2.bonus.bonusSacrificePercentage,
+    hasCompanyCar: partner2.companyCar.hasCompanyCar,
+    carSalarySacrifice: partner2.companyCar.hasCompanyCar ? partner2.companyCar.carSalarySacrifice * 12 : 0,
+    carP11DValue: partner2.companyCar.carP11DValue,
+    carBIKPercentage: partner2.companyCar.carBIKPercentage,
+    carAllowance: (partner2.companyCar.carAllowance ?? 0) * 12,
+    currentAge: partner2.currentAge,
+    retirementAge: partner2.retirementAge,
+    studentLoanPlan: partner2.studentLoanPlan ?? 'none',
+    hasPostgradLoan: partner2.hasPostgradLoan ?? false,
+    // Child Benefit and Tax-Free Childcare are assessed on the household, so
+    // they are handled where both partners are known rather than per person.
+    hasChildren: false,
+    numberOfChildren: 0,
+    claimsChildBenefit: false,
+  }), [partner2]);
+
   const resultA = useMemo(() => calculateAllResults(inputsA), [inputsA]);
+  const resultP2 = useMemo(
+    () => partner2.enabled ? calculateAllResults(inputsPartner2) : null,
+    [partner2.enabled, inputsPartner2]
+  );
   const resultB = useMemo(() => compareMode ? calculateAllResults(inputsB) : null, [compareMode, inputsB]);
 
   // ─── Adjusted take-home values ───
@@ -242,11 +273,14 @@ function App() {
           setChildren={setChildren}
           scenarioB={scenarioB}
           setScenarioB={setScenarioB}
+          partner2={partner2}
+          setPartner2={setPartner2}
           compareMode={compareMode}
           mortgageMaxOverride={house.mortgageMaxOverride}
           useGrossForMortgage={house.useGrossForMortgage}
           resultA={resultA}
           resultB={resultB}
+          resultP2={resultP2}
           adjA={adjA}
           adjB={adjB}
         />

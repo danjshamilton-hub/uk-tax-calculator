@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import type { CalculationResults } from '../types/scenario';
-import type { TaxRegion } from '../data/taxYears';
 import type {
   SalaryState,
   CompanyCarState,
   BonusState,
   ChildrenState,
   ScenarioBState,
+  Partner2State,
 } from '../types/appState';
 import { getTaxBreakdown } from '../lib/calculator';
-import { getStudentLoanPlans, getPostgradLoanConfig, DEFAULT_TAX_YEAR } from '../data/taxYears';
-import type { StudentLoanPlan } from '../data/taxYears';
+import { getStudentLoanPlans, DEFAULT_TAX_YEAR } from '../data/taxYears';
 import { formatCurrency, safeNumber } from '../lib/utils/formatters';
 import { CompareRow } from './CompareRow';
+import { CollapsibleSection } from './CollapsibleSection';
+import { PersonInputs } from './PersonInputs';
 
 interface AdjustedValues {
   effectiveCharge: number;
@@ -35,18 +36,20 @@ interface SalaryTabProps {
   setChildren: (s: ChildrenState | ((prev: ChildrenState) => ChildrenState)) => void;
   scenarioB: ScenarioBState;
   setScenarioB: (s: ScenarioBState | ((prev: ScenarioBState) => ScenarioBState)) => void;
+  partner2: Partner2State;
+  setPartner2: (s: Partner2State | ((prev: Partner2State) => Partner2State)) => void;
   compareMode: boolean;
   mortgageMaxOverride: number;
   useGrossForMortgage: boolean;
   // Computed results
   resultA: CalculationResults;
   resultB: CalculationResults | null;
+  resultP2: CalculationResults | null;
   adjA: AdjustedValues;
   adjB: AdjustedValues | null;
 }
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm box-border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
-const inputClsB = `${inputCls} border-blue-600`;
 const labelCls = 'block mb-1 font-medium text-gray-700 text-sm';
 const fieldCls = 'mb-3';
 const sectionCls = 'bg-gray-50 p-4 rounded-lg mb-4';
@@ -58,10 +61,11 @@ export function SalaryTab({
   bonus, setBonus,
   children, setChildren,
   scenarioB, setScenarioB,
+  partner2, setPartner2,
   compareMode,
   mortgageMaxOverride,
   useGrossForMortgage,
-  resultA, resultB,
+  resultA, resultB, resultP2,
   adjA, adjB,
 }: SalaryTabProps) {
   const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
@@ -75,232 +79,145 @@ export function SalaryTab({
   const updateBBonus = (updates: Partial<BonusState>) => setScenarioB(prev => ({ ...prev, bonus: { ...prev.bonus, ...updates } }));
   const updateB = (updates: Partial<ScenarioBState>) => setScenarioB(prev => ({ ...prev, ...updates }));
 
+  // Partner 2 updaters, mirroring Partner 1's
+  const updatePartner2 = (updates: Partial<Partner2State>) => setPartner2(prev => ({ ...prev, ...updates }));
+  const updateP2Car = (updates: Partial<CompanyCarState>) => setPartner2(prev => ({ ...prev, companyCar: { ...prev.companyCar, ...updates } }));
+  const updateP2Bonus = (updates: Partial<BonusState>) => setPartner2(prev => ({ ...prev, bonus: { ...prev.bonus, ...updates } }));
+  const updateP2B = (updates: Partial<ScenarioBState>) => setPartner2(prev => ({ ...prev, scenarioB: { ...prev.scenarioB, ...updates } }));
+  const updateP2BCar = (updates: Partial<CompanyCarState>) => setPartner2(prev => ({ ...prev, scenarioB: { ...prev.scenarioB, companyCar: { ...prev.scenarioB.companyCar, ...updates } } }));
+  const updateP2BBonus = (updates: Partial<BonusState>) => setPartner2(prev => ({ ...prev, scenarioB: { ...prev.scenarioB, bonus: { ...prev.scenarioB.bonus, ...updates } } }));
+
   return (
     <div className={`grid gap-6 ${compareMode ? 'grid-cols-[400px_1fr]' : 'grid-cols-1 md:grid-cols-[400px_1fr]'}`}>
       {/* Input Form */}
+      {/* Input Form */}
       <div>
-        {/* Income & Pension */}
-        <div className={sectionCls}>
-          <h2 className={sectionHeaderCls}>Income & Pension</h2>
+        {/* ─── Partner 1 ─── */}
+        <CollapsibleSection
+          title="Partner 1"
+          summary={formatCurrency(salary.grossSalary)}
+          defaultOpen
+        >
+          <PersonInputs
+            values={{
+              grossSalary: salary.grossSalary,
+              employeePensionPercentage: salary.employeePensionPercentage,
+              employerPensionPercentage: salary.employerPensionPercentage,
+              companyCar,
+              bonus,
+            }}
+            onChange={u => updateSalary(u)}
+            onCarChange={updateCar}
+            onBonusChange={updateBonus}
+            personal={{
+              taxRegion: salary.taxRegion,
+              currentAge: salary.currentAge,
+              retirementAge: salary.retirementAge,
+              studentLoanPlan: salary.studentLoanPlan,
+              hasPostgradLoan: salary.hasPostgradLoan,
+              onChange: updateSalary,
+            }}
+          />
+        </CollapsibleSection>
 
-          {compareMode ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Scenario A</div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Gross Salary</label>
-                  <input type="number" value={salary.grossSalary} onChange={e => updateSalary({ grossSalary: safeNumber(e.target.value) })} className={inputCls} />
-                </div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Your Pension %</label>
-                  <input type="number" value={salary.employeePensionPercentage} onChange={e => updateSalary({ employeePensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
-                </div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Employer Pension %</label>
-                  <input type="number" value={salary.employerPensionPercentage} onChange={e => updateSalary({ employerPensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-blue-600 mb-1">Scenario B</div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Gross Salary</label>
-                  <input type="number" value={scenarioB.grossSalary} onChange={e => updateB({ grossSalary: safeNumber(e.target.value) })} className={inputClsB} />
-                </div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Your Pension %</label>
-                  <input type="number" value={scenarioB.employeePensionPercentage} onChange={e => updateB({ employeePensionPercentage: safeNumber(e.target.value) })} className={inputClsB} min="0" max="100" />
-                </div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Employer Pension %</label>
-                  <input
-                    type="number"
-                    value={scenarioB.employerPensionPercentage ?? salary.employerPensionPercentage}
-                    onChange={e => updateB({ employerPensionPercentage: safeNumber(e.target.value) })}
-                    className={inputClsB}
-                    min="0"
-                    max="100"
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className={fieldCls}>
-              <label className={labelCls}>Annual Gross Salary</label>
-              <input type="number" value={salary.grossSalary} onChange={e => updateSalary({ grossSalary: safeNumber(e.target.value) })} className={inputCls} />
-            </div>
-          )}
-
-          <div className={fieldCls}>
-            <label className={labelCls}>Tax Region</label>
-            <select value={salary.taxRegion} onChange={e => updateSalary({ taxRegion: e.target.value as TaxRegion })} className={inputCls}>
-              <option value="scotland">Scotland</option>
-              <option value="england">England & Wales</option>
-            </select>
-          </div>
-
-          {!compareMode && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className={fieldCls}>
-                <label className={labelCls}>Your Pension %</label>
-                <input type="number" value={salary.employeePensionPercentage} onChange={e => updateSalary({ employeePensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
-              </div>
-              <div className={fieldCls}>
-                <label className={labelCls}>Employer Pension %</label>
-                <input type="number" value={salary.employerPensionPercentage} onChange={e => updateSalary({ employerPensionPercentage: safeNumber(e.target.value) })} className={inputCls} min="0" max="100" />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className={fieldCls}>
-              <label className={labelCls}>Current Age</label>
-              <input type="number" value={salary.currentAge} onChange={e => updateSalary({ currentAge: safeNumber(e.target.value, 35) })} className={inputCls} min="18" max="100" />
-            </div>
-            <div className={fieldCls}>
-              <label className={labelCls}>Retirement Age</label>
-              <input type="number" value={salary.retirementAge} onChange={e => updateSalary({ retirementAge: safeNumber(e.target.value, 65) })} className={inputCls} min="50" max="100" />
-            </div>
-          </div>
-
-          {/* Student Loan (shared between scenarios) */}
-          <label className="flex items-center gap-2 mb-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={(salary.studentLoanPlan ?? 'none') !== 'none'}
-              onChange={e => updateSalary({
-                studentLoanPlan: e.target.checked ? 'plan2' : 'none',
-                hasPostgradLoan: e.target.checked ? salary.hasPostgradLoan : false,
-              })}
-              className="w-[18px] h-[18px]"
+        {compareMode && (
+          <CollapsibleSection
+            title="Partner 1 — Scenario B"
+            summary={formatCurrency(scenarioB.grossSalary)}
+            accent
+          >
+            <PersonInputs
+              accent
+              values={{
+                grossSalary: scenarioB.grossSalary,
+                employeePensionPercentage: scenarioB.employeePensionPercentage,
+                employerPensionPercentage:
+                  scenarioB.employerPensionPercentage ?? salary.employerPensionPercentage,
+                companyCar: scenarioB.companyCar,
+                bonus: scenarioB.bonus,
+              }}
+              onChange={updateB}
+              onCarChange={updateBCar}
+              onBonusChange={updateBBonus}
             />
-            <span>Student Loan</span>
-          </label>
-          {(salary.studentLoanPlan ?? 'none') !== 'none' && (
-            <div className="grid grid-cols-2 gap-3 items-end">
-              <div className={fieldCls}>
-                <label className={labelCls}>Plan</label>
-                <select
-                  value={salary.studentLoanPlan}
-                  onChange={e => updateSalary({ studentLoanPlan: e.target.value as StudentLoanPlan })}
-                  className={inputCls}
-                >
-                  {Object.entries(getStudentLoanPlans(DEFAULT_TAX_YEAR)).map(([id, cfg]) => (
-                    <option key={id} value={id}>
-                      {cfg.label} — {cfg.rate}% over £{cfg.threshold.toLocaleString()}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={fieldCls}>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={salary.hasPostgradLoan ?? false}
-                    onChange={e => updateSalary({ hasPostgradLoan: e.target.checked })}
-                  />
-                  + Postgraduate ({getPostgradLoanConfig(DEFAULT_TAX_YEAR).rate}%)
-                </label>
-              </div>
-            </div>
-          )}
-        </div>
+            <p className="text-[11px] text-gray-500 mt-2">
+              Region, ages and student loan are shared with Scenario A.
+            </p>
+          </CollapsibleSection>
+        )}
 
-        {/* Company Car */}
-        <div className={sectionCls}>
-          <h2 className={sectionHeaderCls}>Car (Sacrifice or Allowance)</h2>
-
-          {compareMode ? (
-            <div className="grid grid-cols-2 gap-3">
-              {/* Scenario A */}
-              <div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Monthly Car Allowance</label>
-                  <input type="number" value={companyCar.carAllowance ?? 0} onChange={e => updateCar({ carAllowance: safeNumber(e.target.value) })} className={inputCls} />
-                </div>
-                <label className="flex items-center gap-2 mb-2 cursor-pointer">
-                  <input type="checkbox" checked={companyCar.hasCompanyCar} onChange={e => updateCar({ hasCompanyCar: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-xs text-gray-500">Scenario A</span>
-                </label>
-                {companyCar.hasCompanyCar && (
-                  <>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>Monthly Sacrifice</label>
-                      <input type="number" value={companyCar.carSalarySacrifice} onChange={e => updateCar({ carSalarySacrifice: safeNumber(e.target.value) })} className={inputCls} />
-                    </div>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>P11D Value</label>
-                      <input type="number" value={companyCar.carP11DValue} onChange={e => updateCar({ carP11DValue: safeNumber(e.target.value) })} className={inputCls} />
-                    </div>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>BIK Rate (%)</label>
-                      <input type="number" value={companyCar.carBIKPercentage} onChange={e => updateCar({ carBIKPercentage: safeNumber(e.target.value, 2) })} className={inputCls} min="0" max="37" />
-                    </div>
-                  </>
-                )}
-              </div>
-              {/* Scenario B */}
-              <div>
-                <div className={fieldCls}>
-                  <label className={labelCls}>Monthly Car Allowance</label>
-                  <input type="number" value={scenarioB.companyCar.carAllowance ?? 0} onChange={e => updateBCar({ carAllowance: safeNumber(e.target.value) })} className={inputClsB} />
-                </div>
-                <label className="flex items-center gap-2 mb-2 cursor-pointer">
-                  <input type="checkbox" checked={scenarioB.companyCar.hasCompanyCar} onChange={e => updateBCar({ hasCompanyCar: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-xs text-blue-600">Scenario B</span>
-                </label>
-                {scenarioB.companyCar.hasCompanyCar && (
-                  <>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>Monthly Sacrifice</label>
-                      <input type="number" value={scenarioB.companyCar.carSalarySacrifice} onChange={e => updateBCar({ carSalarySacrifice: safeNumber(e.target.value) })} className={inputClsB} />
-                    </div>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>P11D Value</label>
-                      <input type="number" value={scenarioB.companyCar.carP11DValue} onChange={e => updateBCar({ carP11DValue: safeNumber(e.target.value) })} className={inputClsB} />
-                    </div>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>BIK Rate (%)</label>
-                      <input type="number" value={scenarioB.companyCar.carBIKPercentage} onChange={e => updateBCar({ carBIKPercentage: safeNumber(e.target.value, 2) })} className={inputClsB} min="0" max="37" />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+        {/* ─── Partner 2 ─── */}
+        <CollapsibleSection
+          title="Partner 2"
+          summary={partner2.enabled ? formatCurrency(partner2.grossSalary) : 'not added'}
+          headerControl={
+            <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={partner2.enabled}
+                onChange={e => updatePartner2({ enabled: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-gray-600">Include</span>
+            </label>
+          }
+        >
+          {partner2.enabled ? (
+            <PersonInputs
+              values={{
+                grossSalary: partner2.grossSalary,
+                employeePensionPercentage: partner2.employeePensionPercentage,
+                employerPensionPercentage: partner2.employerPensionPercentage,
+                companyCar: partner2.companyCar,
+                bonus: partner2.bonus,
+              }}
+              onChange={updatePartner2}
+              onCarChange={updateP2Car}
+              onBonusChange={updateP2Bonus}
+              personal={{
+                taxRegion: partner2.taxRegion,
+                currentAge: partner2.currentAge,
+                retirementAge: partner2.retirementAge,
+                studentLoanPlan: partner2.studentLoanPlan,
+                hasPostgradLoan: partner2.hasPostgradLoan,
+                onChange: updatePartner2,
+              }}
+            />
           ) : (
-            <>
-              <div className={fieldCls}>
-                <label className={labelCls}>Monthly Car Allowance (cash)</label>
-                <input type="number" value={companyCar.carAllowance ?? 0} onChange={e => updateCar({ carAllowance: safeNumber(e.target.value) })} className={inputCls} />
-                <span className="text-[11px] text-gray-500">Paid with salary — taxed & NI'd normally, counts towards ANI. Not pensionable.</span>
-              </div>
-              <label className="flex items-center gap-2 mb-3 cursor-pointer">
-                <input type="checkbox" checked={companyCar.hasCompanyCar} onChange={e => updateCar({ hasCompanyCar: e.target.checked })} className="w-[18px] h-[18px]" />
-                <span>Enable Company Car (salary sacrifice)</span>
-              </label>
-              {companyCar.hasCompanyCar && (
-                <>
-                  <div className={fieldCls}>
-                    <label className={labelCls}>Monthly Salary Sacrifice</label>
-                    <input type="number" value={companyCar.carSalarySacrifice} onChange={e => updateCar({ carSalarySacrifice: safeNumber(e.target.value) })} className={inputCls} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className={fieldCls}>
-                      <label className={labelCls}>Car P11D Value</label>
-                      <input type="number" value={companyCar.carP11DValue} onChange={e => updateCar({ carP11DValue: safeNumber(e.target.value) })} className={inputCls} />
-                    </div>
-                    <div className={fieldCls}>
-                      <label className={labelCls}>BIK Rate (%)</label>
-                      <input type="number" value={companyCar.carBIKPercentage} onChange={e => updateCar({ carBIKPercentage: safeNumber(e.target.value, 2) })} className={inputCls} min="0" max="37" />
-                      <span className="text-[11px] text-gray-500">2% for EVs</span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
+            <p className="text-[13px] text-gray-500">
+              Tick <em>Include</em> to add a second earner. Their figures feed the House
+              Purchase, Budget and Maternity tabs.
+            </p>
           )}
-        </div>
+        </CollapsibleSection>
 
-        {/* Children */}
+        {compareMode && partner2.enabled && (
+          <CollapsibleSection
+            title="Partner 2 — Scenario B"
+            summary={formatCurrency(partner2.scenarioB.grossSalary)}
+            accent
+          >
+            <PersonInputs
+              accent
+              values={{
+                grossSalary: partner2.scenarioB.grossSalary,
+                employeePensionPercentage: partner2.scenarioB.employeePensionPercentage,
+                employerPensionPercentage:
+                  partner2.scenarioB.employerPensionPercentage ?? partner2.employerPensionPercentage,
+                companyCar: partner2.scenarioB.companyCar,
+                bonus: partner2.scenarioB.bonus,
+              }}
+              onChange={updateP2B}
+              onCarChange={updateP2BCar}
+              onBonusChange={updateP2BBonus}
+            />
+            <p className="text-[11px] text-gray-500 mt-2">
+              Region, ages and student loan are shared with Scenario A.
+            </p>
+          </CollapsibleSection>
+        )}
+
+        {/* ─── Children (household-wide) ─── */}
         <div className={sectionCls}>
           <div className={sectionHeaderCls}>
             <input type="checkbox" checked={children.hasChildren} onChange={e => updateChildren({ hasChildren: e.target.checked })} className="w-[18px] h-[18px]" />
@@ -360,19 +277,38 @@ export function SalaryTab({
           )}
         </div>
 
-        {/* Bonus */}
-        <div className={sectionCls}>
-          <h2 className={sectionHeaderCls}>Bonus</h2>
-          {compareMode ? (
-            <div className="grid grid-cols-2 gap-3">
-              <BonusSection label="Scenario A" labelColor="text-gray-500" inputClass={inputCls} bonus={bonus} onUpdate={updateBonus} result={resultA} />
-              <BonusSection label="Scenario B" labelColor="text-blue-600" inputClass={inputClsB} bonus={scenarioB.bonus} onUpdate={updateBBonus} result={resultB ?? resultA} />
-            </div>
-          ) : (
-            <BonusSection inputClass={inputCls} bonus={bonus} onUpdate={updateBonus} result={resultA} showHelp />
-          )}
-        </div>
+        {/* ─── Household summary ─── */}
+        {partner2.enabled && resultP2 && (
+          <div className={`${sectionCls} !bg-emerald-50`}>
+            <h2 className={sectionHeaderCls}>Household</h2>
+            <table className="w-full text-[13px]">
+              <tbody>
+                <tr className="border-b border-emerald-200">
+                  <td className="py-1.5">Partner 1 take-home</td>
+                  <td className="py-1.5 text-right">{formatCurrency(adjA.adjustedAnnual)}</td>
+                </tr>
+                <tr className="border-b border-emerald-200">
+                  <td className="py-1.5">Partner 2 take-home</td>
+                  <td className="py-1.5 text-right">{formatCurrency(resultP2.annualTakeHome)}</td>
+                </tr>
+                <tr className="font-bold">
+                  <td className="py-2">Combined</td>
+                  <td className="py-2 text-right">
+                    {formatCurrency(adjA.adjustedAnnual + resultP2.annualTakeHome)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-1 text-gray-500">Per month</td>
+                  <td className="py-1 text-right text-gray-500">
+                    {formatCurrency((adjA.adjustedAnnual + resultP2.annualTakeHome) / 12)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
 
       {/* Results */}
       <div>
@@ -683,44 +619,6 @@ function MonthlyRow({ label, valueA, valueB, compareMode }: { label: string; val
   );
 }
 
-function BonusSection({ label, labelColor, inputClass, bonus, onUpdate, result, showHelp }: {
-  label?: string;
-  labelColor?: string;
-  inputClass: string;
-  bonus: BonusState;
-  onUpdate: (updates: Partial<BonusState>) => void;
-  result: CalculationResults;
-  showHelp?: boolean;
-}) {
-  return (
-    <div>
-      {label && <div className={`text-xs ${labelColor} mb-1`}>{label}</div>}
-      <div className={fieldCls}>
-        <label className={labelCls}>Bonus Amount</label>
-        <input type="number" value={bonus.bonusAmount} onChange={e => onUpdate({ bonusAmount: safeNumber(e.target.value) })} className={inputClass} />
-      </div>
-      {bonus.bonusAmount > 0 && (
-        <div className={fieldCls}>
-          <label className={labelCls}>Sacrifice to Pension: {bonus.bonusSacrificePercentage}%</label>
-          <input type="range" min="0" max="100" step="5" value={bonus.bonusSacrificePercentage} onChange={e => onUpdate({ bonusSacrificePercentage: safeNumber(e.target.value) })} className="w-full" />
-          <div className="flex justify-between text-[11px] text-gray-500">
-            <span>0%</span>
-            <span>100%</span>
-          </div>
-          {showHelp && <span className="text-[11px] text-gray-500">Saves tax and NI, reduces ANI</span>}
-          {bonus.bonusSacrificePercentage > 0 && (
-            <div className="bg-green-50 p-2 rounded mt-2 text-xs">
-              <div className="text-green-800 font-bold">
-                Sacrificing: {formatCurrency(bonus.bonusAmount * bonus.bonusSacrificePercentage / 100)} {showHelp && `\u2192 Tax saved: ~${formatCurrency(bonus.bonusAmount * bonus.bonusSacrificePercentage / 100 * (result.combinedMarginalRate / 100))}`}
-              </div>
-              {showHelp && <div className="text-gray-500">Added to pension pot instead</div>}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function TaxRateCard({ label, bgClass, labelColor, result }: {
   label: string;
