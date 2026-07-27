@@ -258,30 +258,32 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
   const { profile, plan } = ctx;
   const window = getLeaveWindow(plan);
 
+  // Average weekly earnings, the basis the statutory schedule is defined against
+  const weeklySalary = profile.grossSalary / 52;
+
   return (weekIndex: number): WeeklyPay => {
-    // Salary spread over the actual length of the tax year, so that a full year
-    // of work sums to exactly the annual salary. Statutory pay, by contrast, is
-    // a genuine weekly amount.
-    const weeklySalary = (profile.grossSalary * 7) / daysInTaxYear(ctx.weekTaxYear(weekIndex));
     const onLeave =
       !ctx.baseline && window.totalWeeks > 0 && weekIndex >= window.startWeek && weekIndex < window.endWeek;
 
     if (!onLeave) {
       // Working. After the leave ends, salary may be reduced (part-time return).
       const returnedToWork = !ctx.baseline && window.totalWeeks > 0 && weekIndex >= window.endWeek;
-      const factor = returnedToWork ? plan.returnSalaryPercent / 100 : 1;
-      const gross = weeklySalary * factor;
-      const employeePension = gross * (profile.employeePensionPercentage / 100);
-      const employerPension = gross * (profile.employerPensionPercentage / 100);
+      const salaryFactor = returnedToWork ? plan.returnSalaryPercent / 100 : 1;
+      const gross = weeklySalary * salaryFactor;
 
       return {
         weekIndex,
         status: 'working',
-        payLabel: factor === 1 ? 'Full pay' : `${plan.returnSalaryPercent}% pay`,
+        payLabel: salaryFactor === 1 ? 'Full pay' : `${plan.returnSalaryPercent}% pay`,
         gross,
         statutoryEntitlement: 0,
-        employeePension,
-        employerPension,
+        employeePension: gross * (profile.employeePensionPercentage / 100),
+        employerPension: gross * (profile.employerPensionPercentage / 100),
+        salaryFactor,
+        statutoryWeekly: 0,
+        employeePensionRate: profile.employeePensionPercentage,
+        employerPensionRate: profile.employerPensionPercentage,
+        employerOnPreLeaveSalary: false,
       };
     }
 
@@ -298,22 +300,24 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
       ? (plan.role === 'birthParent' ? 'maternity' : 'shared')
       : statutory.status;
 
+    // Occupational pay is a share of normal salary and is levelled by payroll
+    // like any other salary; statutory pay is a fixed weekly cash amount.
+    const salaryFactor =
+      usesOccupational && weeklySalary > 0 ? occupational.amount / weeklySalary : 0;
+    const statutoryWeekly = usesOccupational ? 0 : statutory.amount;
+
     // Employee contributions follow actual pay, and can be paused during leave.
     // Modelled as a net-pay/relief-at-source deduction, which is the common case
     // and can be taken from statutory pay. (Under a salary sacrifice arrangement
     // statutory pay cannot be sacrificed — flagged as a warning instead, since
     // the two arrangements differ only in NI treatment and NI is nil on these
     // weeks anyway.)
-    const employeePension = Math.min(
-      gross * (plan.employeePensionPercentDuringLeave / 100),
-      gross
-    );
+    const employeePensionRate = Math.min(100, plan.employeePensionPercentDuringLeave);
 
     // The employer must keep contributing on pre-leave salary through the paid
     // weeks of statutory leave.
-    const employerBase =
-      plan.employerMaintainsPension && statutory.amount > 0 ? weeklySalary : gross;
-    const employerPension = employerBase * (profile.employerPensionPercentage / 100);
+    const employerOnPreLeaveSalary = plan.employerMaintainsPension && statutory.amount > 0;
+    const employerBase = employerOnPreLeaveSalary ? weeklySalary : gross;
 
     return {
       weekIndex,
@@ -321,8 +325,13 @@ function buildWeeklyPay(ctx: WeeklyContext): (weekIndex: number) => WeeklyPay {
       payLabel,
       gross,
       statutoryEntitlement: statutory.amount,
-      employeePension,
-      employerPension,
+      employeePension: gross * (employeePensionRate / 100),
+      employerPension: employerBase * (profile.employerPensionPercentage / 100),
+      salaryFactor,
+      statutoryWeekly,
+      employeePensionRate,
+      employerPensionRate: profile.employerPensionPercentage,
+      employerOnPreLeaveSalary,
     };
   };
 }
@@ -339,13 +348,19 @@ interface MonthTotals {
 }
 
 /**
- * Sum a parent's weekly pay across a tax month, apportioning each week by the
- * days of it that fall inside the month.
+ * Sum a parent's pay across a tax month.
+ *
+ * Salary is levelled: payroll pays a twelfth of the annual salary every month,
+ * whatever the month's length, so a month is worth (annual/12) scaled by the
+ * proportion of it spent on normal pay. Statutory parental pay is genuinely a
+ * weekly amount, so it is accrued per day at a seventh of the weekly rate — a
+ * longer month really does contain more of it.
  */
 function aggregateMonth(
   month: TaxMonth,
   birthDate: Date,
-  weeklyPay: (weekIndex: number) => WeeklyPay
+  weeklyPay: (weekIndex: number) => WeeklyPay,
+  annualSalary: number
 ): MonthTotals {
   let gross = 0;
   let employeePension = 0;
@@ -355,13 +370,20 @@ function aggregateMonth(
   const statusDays = new Map<WeekStatus, number>();
   const labelDays = new Map<string, number>();
 
+  const daysInMonth =
+    Math.round((month.end.getTime() - month.start.getTime()) / MS_PER_DAY) + 1;
+  const salaryPerDay = annualSalary / 12 / daysInMonth;
+
   for (let t = month.start.getTime(); t <= month.end.getTime(); t += MS_PER_DAY) {
     const weekIndex = Math.floor((t - birthDate.getTime()) / MS_PER_WEEK);
     const week = weeklyPay(weekIndex);
 
-    gross += week.gross / 7;
-    employeePension += week.employeePension / 7;
-    employerPension += week.employerPension / 7;
+    const dayPay = week.salaryFactor * salaryPerDay + week.statutoryWeekly / 7;
+    const employerBase = week.employerOnPreLeaveSalary ? salaryPerDay : dayPay;
+
+    gross += dayPay;
+    employeePension += dayPay * (week.employeePensionRate / 100);
+    employerPension += employerBase * (week.employerPensionRate / 100);
 
     statusDays.set(week.status, (statusDays.get(week.status) ?? 0) + 1);
     labelDays.set(week.payLabel, (labelDays.get(week.payLabel) ?? 0) + 1);
@@ -412,7 +434,7 @@ function computeParentYear(
 ): ParentYearComputation {
   const months = getTaxMonths(taxYear).map((month) => ({
     month,
-    totals: aggregateMonth(month, birthDate, weeklyPay),
+    totals: aggregateMonth(month, birthDate, weeklyPay, profile.grossSalary),
   }));
 
   const annualGross = months.reduce((sum, m) => sum + m.totals.gross, 0);

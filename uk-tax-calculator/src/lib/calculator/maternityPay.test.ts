@@ -146,7 +146,7 @@ describe('statutory maternity pay schedule', () => {
       1
     );
 
-    const weeklySalary = (52000 * 7) / 365;
+    const weeklySalary = 52000 / 52;
     expect(schedule[0].gross).toBeCloseTo(weeklySalary, 2); // not salary + SMP
     expect(schedule[0].payLabel).toBe('Full pay');
     expect(schedule[26].gross).toBeCloseTo(RATE_2026, 2);
@@ -157,7 +157,7 @@ describe('statutory maternity pay schedule', () => {
       inputs({ plan1: birthPlan({ payBands: [{ weeks: 39, mode: 'percentOfSalary', percent: 50 }] }) }),
       1
     );
-    const weeklySalary = (52000 * 7) / 365;
+    const weeklySalary = 52000 / 52;
 
     // Weeks 1-6 are SMP at 90% of earnings, which beats the employer's half pay
     expect(schedule[0].gross).toBeCloseTo((52000 / 52) * 0.9, 2);
@@ -298,12 +298,18 @@ describe('baseline comparison', () => {
       inputs({ plan2: partnerPlan({ paternityLeaveWeeks: 0 }) })
     );
 
-    const dailySalary = 52000 / 365;
-    const expectedDrop =
-      273 * dailySalary - // 39 weeks of salary given up
-      (6 * (52000 / 52) * 0.9 + 33 * RATE_2026); // statutory pay received
+    // Statutory pay accrues per day at a seventh of the weekly rate, so 39 whole
+    // weeks of leave pays exactly 39 weeks of statutory.
+    const statutoryReceived = 6 * (52000 / 52) * 0.9 + 33 * RATE_2026;
 
-    expect(result.grossDrop).toBeCloseTo(expectedDrop, 0);
+    // Salary is levelled at annual/12, so the salary given up over 273 days of
+    // leave is close to, but not exactly, a day-proportional share of the year.
+    const salaryForgone = 52000 * (273 / 365);
+    const expectedDrop = salaryForgone - statutoryReceived;
+
+    // Levelled salary and a day-proportional share of the year differ slightly,
+    // because leave weeks do not line up with month boundaries.
+    expect(Math.abs(result.grossDrop - expectedDrop)).toBeLessThan(400);
   });
 
   it('costs less after tax than the headline gross drop', () => {
@@ -333,6 +339,45 @@ describe('monthly cashflow', () => {
       expect(takeHomeP1).toBeCloseTo(year.parent1.takeHome, 2);
       expect(niP1).toBeCloseTo(year.parent1.nationalInsurance, 2);
     }
+  });
+
+  it('pays an identical amount every month when nothing changes', () => {
+    // Payroll levels salary at annual/12; tax months of 30 and 31 days must not
+    // produce different payslips.
+    const result = calculateMaternityResults(
+      inputs({
+        plan1: birthPlan({ maternityLeaveWeeks: 0 }),
+        plan2: partnerPlan({ paternityLeaveWeeks: 0 }),
+      })
+    );
+
+    const gross = result.monthlyCashflow.map((m) => m.parent1.grossPay);
+    for (const value of gross) {
+      expect(value).toBeCloseTo(52000 / 12, 6);
+    }
+
+    const takeHome = result.monthlyCashflow.map((m) => m.parent1.takeHome);
+    for (const value of takeHome) {
+      expect(value).toBeCloseTo(takeHome[0], 6);
+    }
+  });
+
+  it('keeps months entirely outside the leave level', () => {
+    // Born 1 September, so tax months 1-4 (April to July) are fully worked and
+    // must each pay exactly a twelfth, while tax month 5 straddles the start of
+    // leave and is legitimately lower.
+    const result = calculateMaternityResults(
+      inputs({ birthDate: '2026-09-01', plan2: partnerPlan({ paternityLeaveWeeks: 0 }) })
+    );
+
+    const year = result.monthlyCashflow.filter((m) => m.taxYear === 2026);
+    for (const month of year.filter((m) => m.taxMonth <= 4)) {
+      expect(month.parent1.grossPay).toBeCloseTo(52000 / 12, 6);
+      expect(month.parent1.takeHome).toBeCloseTo(year[0].parent1.takeHome, 6);
+    }
+
+    const straddling = year.find((m) => m.taxMonth === 5)!;
+    expect(straddling.parent1.grossPay).toBeLessThan(52000 / 12);
   });
 
   it('shows the leave months as the tightest', () => {
@@ -435,7 +480,7 @@ describe('pension during leave', () => {
       1
     );
 
-    const weeklySalary = (52000 * 7) / 365;
+    const weeklySalary = 52000 / 52;
     expect(maintained[10].employerPension).toBeCloseTo(weeklySalary * 0.03, 2);
     expect(notMaintained[10].employerPension).toBeCloseTo(RATE_2026 * 0.03, 2);
   });

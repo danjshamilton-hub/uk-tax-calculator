@@ -89,10 +89,25 @@ export interface WeeklyPay {
   weekIndex: number; // relative to the birth week
   status: WeekStatus;
   payLabel: string;
+  /** Indicative weekly amount, for displaying the schedule */
   gross: number;
   statutoryEntitlement: number;
   employeePension: number;
   employerPension: number;
+
+  // Basis for monthly aggregation. Salary is levelled to annual/12 by payroll
+  // regardless of how many days a month contains, so it is carried as a
+  // proportion of normal pay rather than a cash amount. Statutory pay really is
+  // a weekly cash amount and stays one.
+  /** Proportion of normal salary paid this week: 1 full pay, 0.5 half pay, 0 statutory-only */
+  salaryFactor: number;
+  /** Absolute statutory cash for the week, 0 when the employer scheme pays more */
+  statutoryWeekly: number;
+  /** Employee pension rate applied to actual pay this week */
+  employeePensionRate: number;
+  employerPensionRate: number;
+  /** Employer contributes on pre-leave salary rather than actual pay */
+  employerOnPreLeaveSalary: boolean;
 }
 
 export interface ParentMonthRow {
