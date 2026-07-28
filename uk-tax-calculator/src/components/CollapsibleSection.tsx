@@ -9,6 +9,8 @@ interface CollapsibleSectionProps {
   accent?: boolean;
   /** Optional control rendered in the header, e.g. an enable checkbox */
   headerControl?: ReactNode;
+  /** Indent and rule the section so it reads as belonging to the one above */
+  nested?: boolean;
   children: ReactNode;
 }
 
@@ -18,6 +20,7 @@ export function CollapsibleSection({
   defaultOpen = false,
   accent = false,
   headerControl,
+  nested = false,
   children,
 }: CollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -26,7 +29,7 @@ export function CollapsibleSection({
     <div
       className={`rounded-lg mb-4 border ${
         accent ? 'border-blue-300 bg-blue-50/40' : 'border-gray-200 bg-gray-50'
-      }`}
+      } ${nested ? 'ml-6 -mt-2 border-l-4 border-l-blue-400' : ''}`}
     >
       <div className="flex items-center gap-2 px-4 py-3">
         <button
@@ -41,7 +44,11 @@ export function CollapsibleSection({
           >
             ▶
           </span>
-          <span className={`text-base font-semibold ${accent ? 'text-blue-700' : ''}`}>
+          <span
+            className={`font-semibold ${nested ? 'text-sm' : 'text-base'} ${
+              accent ? 'text-blue-700' : ''
+            }`}
+          >
             {title}
           </span>
           {summary && <span className="text-[13px] text-gray-500 font-normal">{summary}</span>}

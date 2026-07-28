@@ -122,9 +122,10 @@ export function SalaryTab({
 
         {compareMode && (
           <CollapsibleSection
-            title="Partner 1 — Scenario B"
+            title="Scenario B"
             summary={formatCurrency(scenarioB.grossSalary)}
             accent
+            nested
           >
             <PersonInputs
               accent
@@ -193,9 +194,10 @@ export function SalaryTab({
 
         {compareMode && partner2.enabled && (
           <CollapsibleSection
-            title="Partner 2 — Scenario B"
+            title="Scenario B"
             summary={formatCurrency(partner2.scenarioB.grossSalary)}
             accent
+            nested
           >
             <PersonInputs
               accent
